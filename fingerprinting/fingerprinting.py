@@ -10,6 +10,12 @@ result_path = "./fingerprinting/results/"
 echoes_total_num = 4
 subjects_total_num = 4
 
+if not os.path.exists(data_path):
+    os.mkdir(data_path)
+
+if not os.path.exists(result_path):
+    os.mkdir(result_path)
+
 ### load data, compute FC and build map of orig_matrix.
 
 # echoes_FCs: 3-dimensional array.
