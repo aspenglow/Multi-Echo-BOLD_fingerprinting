@@ -2,6 +2,7 @@ import numpy as np
 import os
 from sklearn.decomposition import PCA
 from matplotlib import pyplot as plt
+from matplotlib.ticker import MaxNLocator
 from scipy.stats import pearsonr
 
 ### set global variables.
@@ -49,7 +50,10 @@ for file in os.listdir(data_path):
     subject_index = echoes_count[echo_index]
     echoes_orig_matrixs[echo_index][subject_index] = orig_row 
     echoes_count[echo_index] += 1
-    
+
+echoes_FCs_mean = np.mean(echoes_FCs, axis=0)
+echoes_FCs -= echoes_FCs_mean
+
 ### For each echo-pair, use PCA method to get optimal principle components for matrix reconstruction.
 for echo_index1 in range(echoes_total_num):
     for echo_index2 in range(echoes_total_num):
@@ -57,10 +61,9 @@ for echo_index1 in range(echoes_total_num):
             continue
         orig_matrix1 = echoes_orig_matrixs[echo_index1]
         orig_matrix2 = echoes_orig_matrixs[echo_index2]
-        orig_matrix = np.concatenate((orig_matrix1, orig_matrix2))
+        orig_matrix = np.seros()
         max_numPCs = 2 * subjects_total_num
         mask_diag = np.diag(np.full(subjects_total_num, True, dtype=bool))
-        PCA_comps_range = np.array(range(2,max_numPCs+1))
 
         # Compute Identifiability matrix, original FCs
         Ident_mat_orig = np.zeros((subjects_total_num, subjects_total_num))
@@ -74,9 +77,10 @@ for echo_index1 in range(echoes_total_num):
         Idiff_orig = (Iself_orig - Iothers_orig) * 100
 
         # Differential Identifiability (Idiff) evaluation of PCA decomposition into FC-modes
-        Idiff_recon = np.zeros(max_numPCs)
+        Idiff_recon = np.zeros(max_numPCs-1)
+        PCA_comps_range = np.array(range(1,max_numPCs))
         for n in PCA_comps_range:
-            pca = PCA(n_components=n)
+            pca = PCA(n_components=n+2)
             recon_matrix = pca.inverse_transform(pca.fit_transform(orig_matrix))
             recon_matrix1 = recon_matrix[0:subjects_total_num,:]
             recon_matrix2 = recon_matrix[subjects_total_num:,:]
@@ -93,7 +97,7 @@ for echo_index1 in range(echoes_total_num):
 
         # Identifiability matrix at optimal reconstruction
         Idiff_opt = np.max(Idiff_recon)
-        m_star = PCA_comps_range[Idiff_recon[1:] == Idiff_opt][0]
+        m_star = PCA_comps_range[Idiff_recon == Idiff_opt][0]
         pca = PCA(n_components=m_star)
         recon_matrix_opt = pca.inverse_transform(pca.fit_transform(orig_matrix))
         recon_matrix_opt1 = recon_matrix_opt[0:subjects_total_num,:]
@@ -105,21 +109,29 @@ for echo_index1 in range(echoes_total_num):
                 Ident_mat_recon_opt[i,j] = pearsonr(recon_matrix_opt1[i,:], recon_matrix_opt2[j,:]).statistic
 
         ### Draw related results
+        str_echo_index1 = str(echo_index1+1)
+        str_echo_index2 = str(echo_index2+1)
+
         fig, (ax0, ax1, ax2) = plt.subplots(1,3)
         c = ax0.pcolor(Ident_mat_orig)
         ax0.set_title('original Ident matrix')
         ax0.invert_yaxis()
         ax0.set_aspect('equal', adjustable='box')
-        ax0.set_xlabel('Subject')
-        ax0.set_ylabel('Subject')
-        ax0.axis('off')
+        ax0.set_xlabel('Subjects (echo ' + str_echo_index2 + ')') 
+        ax0.set_ylabel('Subjects (echo ' + str_echo_index1 + ')')
+        ax0.set_xticks([])
+        ax0.set_yticks([])
+        ax0.spines['top'].set_position(('data', 0))
+        # fig.colorbar()
+        # ax0.axis('off')
 
-        c = ax1.plot(PCA_comps_range, Idiff_recon[1:])
+        c = ax1.plot(PCA_comps_range, Idiff_recon)
         ax1.plot(PCA_comps_range, Idiff_orig*np.ones(PCA_comps_range.size), )
         ax1.plot(m_star, Idiff_opt, '-sk')
         ax1.set_title('Idiff assessment based on PCA decomposition')
         ax1.axis('tight')
 
+        ax1.xaxis.set_major_locator(MaxNLocator(integer=True))
         ax1.set_xlabel('Number of PCA components')
         ax1.set_ylabel('IDiff (%)')
 
@@ -127,10 +139,13 @@ for echo_index1 in range(echoes_total_num):
         ax2.set_title('Optimal reconstruction')
         ax2.invert_yaxis()
         ax2.set_aspect('equal', adjustable='box')
-        ax2.set_xlabel('Subject')
-        ax2.set_ylabel('Subject')
-        ax2.axis('off')
+        ax2.set_aspect('equal', adjustable='box')
+        ax2.set_xlabel('Subjects (echo ' + str_echo_index2 + ')') 
+        ax2.set_ylabel('Subjects (echo ' + str_echo_index1 + ')')
+        ax2.set_xticks([])
+        ax2.set_yticks([])
 
         plt.tight_layout()
         # plt.show()
-        plt.savefig(result_path + "Result_with_echo_" + str(echo_index1+1) + "&" + str(echo_index2+1) + ".jpg")
+        print("Succeed to get result with " + str_echo_index1 + "-" + str_echo_index2 + " echo pair.")
+        plt.savefig(result_path + "Result_with_echo_" + str_echo_index1 + "&" + str_echo_index2 + ".jpg")
