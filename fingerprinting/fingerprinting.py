@@ -19,11 +19,14 @@ if not os.path.exists(result_path):
 
 ### load data, compute FC and build map of orig_matrix.
 
-# echoes_FCs: 3-dimensional array.
-#   dims:  0: echo_index.  1,2 : FC matrixs
+# echoes_FCs: 4-dimensional array.
+#   dims:  0: echo_index.  1: subject index.  2,3: FC matrixs
 # echoes_orig_matrixs: 3-dimensional array. 
-#   dims:  0: echo_index.  1: subject index.  2: flatten FC vectors.
-
+#   dims:  0: echo_index.  1: flatted FC vectors. 2: subjects index
+'''
+    For original matrix in each echo, each column is a flatted tril FC vector, 
+and different columns mean different subjects. Same as the data in MATLAB.
+'''
 FC_side_length = -1
 for file in os.listdir(data_path):
     if "echo-" not in file: 
@@ -36,23 +39,27 @@ for file in os.listdir(data_path):
     FC = np.corrcoef(data)
     # Flatten low triangle of a FC matrix to a vector
     mask = np.tril(np.full((FC.shape[0], FC.shape[0]), True, dtype=bool), -1)  
-    orig_row = FC[mask]
+    orig_column = FC[mask]
     if FC_side_length < 0:
         # Initialization
         FC_side_length = FC.shape[0]
         echoes_count = np.zeros(echoes_total_num, dtype=int)
-        echoes_FCs_shape = (echoes_total_num, FC_side_length, FC_side_length)
+        echoes_FCs_shape = (echoes_total_num, subjects_total_num, FC_side_length, FC_side_length)
         echoes_FCs = np.zeros(echoes_FCs_shape)
-        echoes_orig_matrixs_shape = (echoes_total_num, subjects_total_num, orig_row.size)
+        echoes_orig_matrixs_shape = (echoes_total_num, orig_column.size, subjects_total_num)
         echoes_orig_matrixs = np.zeros(echoes_orig_matrixs_shape)
 
-    echoes_FCs[echo_index] = FC
     subject_index = echoes_count[echo_index]
-    echoes_orig_matrixs[echo_index][subject_index] = orig_row 
+    echoes_FCs[echo_index, subject_index] = FC
+    echoes_orig_matrixs[echo_index, :, subject_index] = orig_column 
     echoes_count[echo_index] += 1
 
-echoes_FCs_mean = np.mean(echoes_FCs, axis=0)
-echoes_FCs -= echoes_FCs_mean
+# Problem: code in matlab didn't demean each column of original matrix!!!
+echoes_orig_matrixs_mean = np.mean(echoes_orig_matrixs, axis=1) # Calculate mean of each subject and echo
+for echo_index in range(echoes_total_num):
+    for subject_index in range(subjects_total_num):
+        echoes_orig_matrixs[echo_index, :, subject_index] -= echoes_orig_matrixs_mean[echo_index, subject_index] # demean each column.
+print(np.abs(np.sum(np.mean(echoes_orig_matrixs, axis=1))))
 
 ### For each echo-pair, use PCA method to get optimal principle components for matrix reconstruction.
 for echo_index1 in range(echoes_total_num):
@@ -61,7 +68,9 @@ for echo_index1 in range(echoes_total_num):
             continue
         orig_matrix1 = echoes_orig_matrixs[echo_index1]
         orig_matrix2 = echoes_orig_matrixs[echo_index2]
-        orig_matrix = np.seros()
+        orig_matrix = np.zeros((orig_matrix1.shape[0], 2*orig_matrix1.shape[1])) 
+        orig_matrix[:,0::2] = orig_matrix1
+        orig_matrix[:,1::2] = orig_matrix2 # Cross merge each column in orig_matrix1 and orig_matrix2
         max_numPCs = 2 * subjects_total_num
         mask_diag = np.diag(np.full(subjects_total_num, True, dtype=bool))
 
@@ -69,7 +78,7 @@ for echo_index1 in range(echoes_total_num):
         Ident_mat_orig = np.zeros((subjects_total_num, subjects_total_num))
         for i in range(subjects_total_num):
             for j in range(subjects_total_num):
-                Ident_mat_orig[i,j] = pearsonr(orig_matrix1[i,:], orig_matrix2[j,:]).statistic
+                Ident_mat_orig[i,j] = pearsonr(orig_matrix1[:,i], orig_matrix2[:,j]).statistic
 
         # Idiff computation, original FCs
         Iself_orig = np.mean(Ident_mat_orig[mask_diag])
@@ -77,36 +86,44 @@ for echo_index1 in range(echoes_total_num):
         Idiff_orig = (Iself_orig - Iothers_orig) * 100
 
         # Differential Identifiability (Idiff) evaluation of PCA decomposition into FC-modes
+        # Use PCA method to reconstruct original matrix with diffrent number of principle components.
+        '''
+            Notice that the pca.fit_transform get pca based on columns, which is the same as in MATLAB
+        '''
         Idiff_recon = np.zeros(max_numPCs-1)
-        PCA_comps_range = np.array(range(1,max_numPCs))
+        PCA_comps_range = np.array(range(2,max_numPCs+1))
         for n in PCA_comps_range:
-            pca = PCA(n_components=n+2)
-            recon_matrix = pca.inverse_transform(pca.fit_transform(orig_matrix))
-            recon_matrix1 = recon_matrix[0:subjects_total_num,:]
-            recon_matrix2 = recon_matrix[subjects_total_num:,:]
+            pca = PCA(n_components=n)
+            recon_matrix = pca.inverse_transform(pca.fit_transform(orig_matrix.transpose())).transpose()
+            # Add mean to each column of reconstructed matrix.
+            for subject_index in range(subjects_total_num):
+                recon_matrix[:, 2*subject_index] += echoes_orig_matrixs_mean[echo_index1, subject_index]
+                recon_matrix[:, 2*subject_index+1] += echoes_orig_matrixs_mean[echo_index2, subject_index]
+            # Split recon_matrix with different echo. 
+            recon_matrix1 = recon_matrix[:,0::2]
+            recon_matrix2 = recon_matrix[:,1::2]
             # Compute Identifiability matrix, reconstructed FCs with different number of PCs
-            # Ident_mat_recon = np.corr(recon_matrix1, recon_matrix2, rowvar=False)
             Ident_mat_recon = np.zeros((subjects_total_num, subjects_total_num))
             for i in range(subjects_total_num):
                 for j in range(subjects_total_num):
-                    Ident_mat_recon[i,j] = pearsonr(recon_matrix1[i,:], recon_matrix2[j,:]).statistic
+                    Ident_mat_recon[i,j] = pearsonr(recon_matrix1[:,i], recon_matrix2[:,j]).statistic
             # Idiff computation, reconstructed FCs
             Iself_recon = np.mean(Ident_mat_recon[mask_diag])
             Iothers_recon = np.mean(Ident_mat_recon[~mask_diag])
-            Idiff_recon[n-1] = (Iself_recon - Iothers_recon) * 100
+            Idiff_recon[n-2] = (Iself_recon - Iothers_recon) * 100
 
         # Identifiability matrix at optimal reconstruction
         Idiff_opt = np.max(Idiff_recon)
         m_star = PCA_comps_range[Idiff_recon == Idiff_opt][0]
         pca = PCA(n_components=m_star)
         recon_matrix_opt = pca.inverse_transform(pca.fit_transform(orig_matrix))
-        recon_matrix_opt1 = recon_matrix_opt[0:subjects_total_num,:]
-        recon_matrix_opt2 = recon_matrix_opt[subjects_total_num:,:]
+        recon_matrix_opt1 = recon_matrix_opt[:,0::2]
+        recon_matrix_opt2 = recon_matrix_opt[:,1::2]
         # Compute Recon Identifiability matrix at optimal point
         Ident_mat_recon_opt = np.zeros((subjects_total_num, subjects_total_num))
         for i in range(subjects_total_num):
             for j in range(subjects_total_num):
-                Ident_mat_recon_opt[i,j] = pearsonr(recon_matrix_opt1[i,:], recon_matrix_opt2[j,:]).statistic
+                Ident_mat_recon_opt[i,j] = pearsonr(recon_matrix_opt1[:,i], recon_matrix_opt2[:,j]).statistic
 
         ### Draw related results
         str_echo_index1 = str(echo_index1+1)
