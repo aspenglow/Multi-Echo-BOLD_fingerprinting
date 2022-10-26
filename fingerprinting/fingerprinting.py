@@ -85,7 +85,7 @@ for echo_index1 in range(echoes_total_num):
         Ident_mat_orig = np.zeros((subjects_total_num, subjects_total_num))
         for i in range(subjects_total_num):
             for j in range(subjects_total_num):
-                Ident_mat_orig[i,j] = pearsonr(orig_matrix1[:,i], orig_matrix2[:,j]).statistic
+                Ident_mat_orig[i,j] = pearsonr(orig_matrix2[:,i], orig_matrix1[:,j]).statistic
 
         # Idiff computation, original FCs
         Iself_orig = np.mean(Ident_mat_orig[mask_diag])
@@ -99,9 +99,12 @@ for echo_index1 in range(echoes_total_num):
         '''
         Idiff_recon = np.zeros(max_numPCs-1)
         PCA_comps_range = np.array(range(2,max_numPCs+1))
+        pca = PCA(n_components=max_numPCs)
+        pca.fit(orig_matrix)
+        FC_modes = pca.components_.transpose()
+        projected_FC_modes = pca.transform(orig_matrix)
         for n in tqdm(PCA_comps_range):
-            pca = PCA(n_components=n)
-            recon_matrix = pca.inverse_transform(pca.fit_transform(orig_matrix.transpose())).transpose()
+            recon_matrix = np.dot(projected_FC_modes[:,0:n], FC_modes[:,0:n].transpose())
             # Add mean to each column of reconstructed matrix.
             for subject_index in range(subjects_total_num):
                 recon_matrix[:, 2*subject_index] += echoes_orig_matrixs_mean[echo_index1, subject_index]
@@ -113,7 +116,7 @@ for echo_index1 in range(echoes_total_num):
             Ident_mat_recon = np.zeros((subjects_total_num, subjects_total_num))
             for i in range(subjects_total_num):
                 for j in range(subjects_total_num):
-                    Ident_mat_recon[i,j] = pearsonr(recon_matrix1[:,i], recon_matrix2[:,j]).statistic
+                    Ident_mat_recon[i,j] = pearsonr(recon_matrix2[:,i], recon_matrix1[:,j]).statistic
             # Idiff computation, reconstructed FCs
             Iself_recon = np.mean(Ident_mat_recon[mask_diag])
             Iothers_recon = np.mean(Ident_mat_recon[~mask_diag])
@@ -130,7 +133,7 @@ for echo_index1 in range(echoes_total_num):
         Ident_mat_recon_opt = np.zeros((subjects_total_num, subjects_total_num))
         for i in range(subjects_total_num):
             for j in range(subjects_total_num):
-                Ident_mat_recon_opt[i,j] = pearsonr(recon_matrix_opt1[:,i], recon_matrix_opt2[:,j]).statistic
+                Ident_mat_recon_opt[i,j] = pearsonr(recon_matrix_opt2[:,i], recon_matrix_opt1[:,j]).statistic
 
         ### Draw related results
         fig, (ax0, ax1, ax2) = plt.subplots(1,3)
@@ -143,6 +146,7 @@ for echo_index1 in range(echoes_total_num):
         ax0.set_xticks([])
         ax0.set_yticks([])
         ax0.spines['top'].set_position(('data', 0))
+        fig.colorbar(c, ax=ax0, orientation='vertical')
 
         ax1.plot(PCA_comps_range, Idiff_orig*np.ones(PCA_comps_range.size), '--r', label='original data')
         ax1.plot(PCA_comps_range, Idiff_recon, '-b', label="reconstruction data")
@@ -165,6 +169,7 @@ for echo_index1 in range(echoes_total_num):
         ax2.set_ylabel('Subjects (echo ' + str_echo_index1 + ')')
         ax2.set_xticks([])
         ax2.set_yticks([])
+        fig.colorbar(c, ax=ax2, orientation='vertical')
 
         plt.tight_layout()
         # plt.show()

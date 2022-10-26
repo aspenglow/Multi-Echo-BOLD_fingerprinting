@@ -2,4 +2,3 @@ data/*
 fingerprinting/*.ipynb
 fingerprinting/results/*
 *.zip
-test_python_matlab/*
