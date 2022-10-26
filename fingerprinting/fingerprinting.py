@@ -4,15 +4,14 @@ from sklearn.decomposition import PCA
 from matplotlib import pyplot as plt
 from matplotlib.ticker import MaxNLocator
 from scipy.stats import pearsonr
+from tqdm import tqdm
 
 ### set global variables.
 data_path = "./data/"
 result_path = "./fingerprinting/results/"
 echoes_total_num = 4
-subjects_total_num = 4
-
-if not os.path.exists(data_path):
-    os.mkdir(data_path)
+subjects_total_num = int(len(os.listdir(data_path)) / (echoes_total_num + 1)) # there is another optimal TS.
+print("There are " + str(subjects_total_num) + " subjects with " + str(echoes_total_num) + " echoes.")
 
 if not os.path.exists(result_path):
     os.mkdir(result_path)
@@ -28,7 +27,10 @@ if not os.path.exists(result_path):
 and different columns mean different subjects. Same as the data in MATLAB.
 '''
 FC_side_length = -1
-for file in os.listdir(data_path):
+print("Loading data from data path...")
+data_lists = os.listdir(data_path)
+data_lists.sort()
+for file in tqdm(data_lists):
     if "echo-" not in file: 
         continue
     echo_index = file[file.find("echo-")+5 : file.find("echo-")+6]
@@ -37,6 +39,7 @@ for file in os.listdir(data_path):
     data = np.genfromtxt(fname=os.path.join(data_path, file), dtype='float32', delimiter=' ')
     # Calculate functional connectivity (FC) of a time series
     FC = np.corrcoef(data)
+    FC[np.isnan(FC)] = 0.
     # Flatten low triangle of a FC matrix to a vector
     mask = np.tril(np.full((FC.shape[0], FC.shape[0]), True, dtype=bool), -1)  
     orig_column = FC[mask]
@@ -59,13 +62,17 @@ echoes_orig_matrixs_mean = np.mean(echoes_orig_matrixs, axis=1) # Calculate mean
 for echo_index in range(echoes_total_num):
     for subject_index in range(subjects_total_num):
         echoes_orig_matrixs[echo_index, :, subject_index] -= echoes_orig_matrixs_mean[echo_index, subject_index] # demean each column.
-print(np.abs(np.sum(np.mean(echoes_orig_matrixs, axis=1))))
+# print(np.abs(np.sum(np.mean(echoes_orig_matrixs, axis=1))))
 
 ### For each echo-pair, use PCA method to get optimal principle components for matrix reconstruction.
 for echo_index1 in range(echoes_total_num):
     for echo_index2 in range(echoes_total_num):
         if echo_index1 >= echo_index2:
             continue
+        str_echo_index1 = str(echo_index1+1)
+        str_echo_index2 = str(echo_index2+1)
+        print("Calculating result with " + str_echo_index1 + "-" + str_echo_index2 + " echo pair.")
+
         orig_matrix1 = echoes_orig_matrixs[echo_index1]
         orig_matrix2 = echoes_orig_matrixs[echo_index2]
         orig_matrix = np.zeros((orig_matrix1.shape[0], 2*orig_matrix1.shape[1])) 
@@ -92,7 +99,7 @@ for echo_index1 in range(echoes_total_num):
         '''
         Idiff_recon = np.zeros(max_numPCs-1)
         PCA_comps_range = np.array(range(2,max_numPCs+1))
-        for n in PCA_comps_range:
+        for n in tqdm(PCA_comps_range):
             pca = PCA(n_components=n)
             recon_matrix = pca.inverse_transform(pca.fit_transform(orig_matrix.transpose())).transpose()
             # Add mean to each column of reconstructed matrix.
@@ -126,9 +133,6 @@ for echo_index1 in range(echoes_total_num):
                 Ident_mat_recon_opt[i,j] = pearsonr(recon_matrix_opt1[:,i], recon_matrix_opt2[:,j]).statistic
 
         ### Draw related results
-        str_echo_index1 = str(echo_index1+1)
-        str_echo_index2 = str(echo_index2+1)
-
         fig, (ax0, ax1, ax2) = plt.subplots(1,3)
         c = ax0.pcolor(Ident_mat_orig)
         ax0.set_title('original Ident matrix')
@@ -139,14 +143,14 @@ for echo_index1 in range(echoes_total_num):
         ax0.set_xticks([])
         ax0.set_yticks([])
         ax0.spines['top'].set_position(('data', 0))
-        # fig.colorbar()
-        # ax0.axis('off')
 
-        c = ax1.plot(PCA_comps_range, Idiff_recon)
-        ax1.plot(PCA_comps_range, Idiff_orig*np.ones(PCA_comps_range.size), )
-        ax1.plot(m_star, Idiff_opt, '-sk')
-        ax1.set_title('Idiff assessment based on PCA decomposition')
+        ax1.plot(PCA_comps_range, Idiff_orig*np.ones(PCA_comps_range.size), '--r', label='original data')
+        ax1.plot(PCA_comps_range, Idiff_recon, '-b', label="reconstruction data")
+        ax1.plot(m_star, Idiff_opt, '-sk', label="optimal")
+        ax1.set_title('Idiff assessment based on PCA decomposition (optimal #')
         ax1.axis('tight')
+        ax1.legend()
+
 
         ax1.xaxis.set_major_locator(MaxNLocator(integer=True))
         ax1.set_xlabel('Number of PCA components')
@@ -164,5 +168,5 @@ for echo_index1 in range(echoes_total_num):
 
         plt.tight_layout()
         # plt.show()
-        print("Succeed to get result with " + str_echo_index1 + "-" + str_echo_index2 + " echo pair.")
+        print("optimal number of PCs: " + str(m_star) + " optimal IDiff: " + str(Idiff_opt) + "%")
         plt.savefig(result_path + "Result_with_echo_" + str_echo_index1 + "&" + str_echo_index2 + ".jpg")
