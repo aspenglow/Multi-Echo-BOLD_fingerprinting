@@ -57,12 +57,8 @@ for file in tqdm(data_lists):
     echoes_orig_matrixs[echo_index, :, subject_index] = orig_column 
     echoes_count[echo_index] += 1
 
-# Problem: code in matlab didn't demean each column of original matrix!!!
+# Don't need to manually demean the original matrix because when calculating PCA, the function will first demean it automatically.
 echoes_orig_matrixs_mean = np.mean(echoes_orig_matrixs, axis=1) # Calculate mean of each subject and echo
-for echo_index in range(echoes_total_num):
-    for subject_index in range(subjects_total_num):
-        echoes_orig_matrixs[echo_index, :, subject_index] -= echoes_orig_matrixs_mean[echo_index, subject_index] # demean each column.
-# print(np.abs(np.sum(np.mean(echoes_orig_matrixs, axis=1))))
 
 ### For each echo-pair, use PCA method to get optimal principle components for matrix reconstruction.
 for echo_index1 in range(echoes_total_num):
@@ -153,9 +149,7 @@ for echo_index1 in range(echoes_total_num):
         ax1.plot(m_star, Idiff_opt, '-sk', label="optimal")
         ax1.set_title('Idiff assessment based on PCA decomposition (optimal #')
         ax1.axis('tight')
-        ax1.legend()
-
-
+        ax1.legend() 
         ax1.xaxis.set_major_locator(MaxNLocator(integer=True))
         ax1.set_xlabel('Number of PCA components')
         ax1.set_ylabel('IDiff (%)')
