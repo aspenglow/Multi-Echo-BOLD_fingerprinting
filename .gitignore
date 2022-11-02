@@ -1,0 +1,4 @@
+data/*
+fingerprinting/*.ipynb
+fingerprinting/results/*
+*.zip
