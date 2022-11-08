@@ -7,8 +7,8 @@ from scipy.stats import pearsonr
 from tqdm import tqdm
 
 ### set global variables.
-data_path = "./data/"
-result_path = "./fingerprinting/results/"
+data_path = "./data"
+result_path = "./fingerprinting/results"
 echoes_total_num = 4
 subjects_total_num = int(len(os.listdir(data_path)) / (echoes_total_num + 1)) # there is another optimal TS.
 print("There are " + str(subjects_total_num) + " subjects with " + str(echoes_total_num) + " echoes.")
@@ -27,10 +27,10 @@ if not os.path.exists(result_path):
 and different columns mean different subjects. Same as the data in MATLAB.
 '''
 FC_side_length = -1
-print("Loading data from data path...")
+print("Loading time series from data path...")
 data_lists = os.listdir(data_path)
 data_lists.sort()
-for file in tqdm(data_lists):
+for file in tqdm(data_lists, desc='data', leave=False):
     if "echo-" not in file: 
         continue
     echo_index = file[file.find("echo-")+5 : file.find("echo-")+6]
@@ -46,6 +46,7 @@ for file in tqdm(data_lists):
     if FC_side_length < 0:
         # Initialization
         FC_side_length = FC.shape[0]
+        FC_shape = (FC_side_length, FC_side_length)
         echoes_count = np.zeros(echoes_total_num, dtype=int)
         echoes_FCs_shape = (echoes_total_num, subjects_total_num, FC_side_length, FC_side_length)
         echoes_FCs = np.zeros(echoes_FCs_shape)
@@ -60,10 +61,15 @@ for file in tqdm(data_lists):
 # Don't need to manually demean the original matrix because when calculating PCA, the function will first demean it automatically.
 echoes_orig_matrixs_mean = np.mean(echoes_orig_matrixs, axis=1) # Calculate mean of each subject and echo
 
+# Initialize reconstructed FC array.
+# echoes_FCs_recon: 4-dimensional array.
+#   dims:  0: echo_index.  1: subject index.  2,3: reconstructed FC matrixs
+echoes_FCs_recon = np.zeros(echoes_FCs_shape)
+
 ### For each echo-pair, use PCA method to get optimal principle components for matrix reconstruction.
 for echo_index1 in range(echoes_total_num):
     for echo_index2 in range(echoes_total_num):
-        if echo_index1 >= echo_index2:
+        if echo_index1 > echo_index2:
             continue
         str_echo_index1 = str(echo_index1+1)
         str_echo_index2 = str(echo_index2+1)
@@ -83,7 +89,7 @@ for echo_index1 in range(echoes_total_num):
             for j in range(subjects_total_num):
                 Ident_mat_orig[i,j] = pearsonr(orig_matrix2[:,i], orig_matrix1[:,j]).statistic
 
-        # Idiff computation, original FCs
+        # Idiff computation, original Identifiability matrix
         Iself_orig = np.mean(Ident_mat_orig[mask_diag])
         Iothers_orig = np.mean(Ident_mat_orig[~mask_diag])
         Idiff_orig = (Iself_orig - Iothers_orig) * 100
@@ -99,7 +105,7 @@ for echo_index1 in range(echoes_total_num):
         pca.fit(orig_matrix)
         FC_modes = pca.components_.transpose()
         projected_FC_modes = pca.transform(orig_matrix)
-        for n in tqdm(PCA_comps_range):
+        for n in tqdm(PCA_comps_range, desc='PC number', leave=False):
             recon_matrix = np.dot(projected_FC_modes[:,0:n], FC_modes[:,0:n].transpose())
             # Add mean to each column of reconstructed matrix.
             for subject_index in range(subjects_total_num):
@@ -130,6 +136,19 @@ for echo_index1 in range(echoes_total_num):
         for i in range(subjects_total_num):
             for j in range(subjects_total_num):
                 Ident_mat_recon_opt[i,j] = pearsonr(recon_matrix_opt2[:,i], recon_matrix_opt1[:,j]).statistic
+
+        # Reconstruct FC from recon_matrix
+        # Each FC will have overlaps with # of echoes. We consider to average those overlaps. 
+        for subject_index in range(subjects_total_num):
+            FC_recon1 = np.identity(FC_side_length)
+            FC_recon1[mask] = recon_matrix_opt1[:,subject_index]
+            FC_recon1[mask.transpose()] = recon_matrix_opt1[:,subject_index] 
+            echoes_FCs_recon[echo_index1][subject_index] += FC_recon1
+            
+            FC_recon2 = np.identity(FC_side_length)
+            FC_recon2[mask] = recon_matrix_opt2[:,subject_index]
+            FC_recon2[mask.transpose()] = recon_matrix_opt2[:,subject_index]
+            echoes_FCs_recon[echo_index2][subject_index] += FC_recon2 # Each FC will have overlaps with # of echoes. Need to divide by it in the end.
 
         ### Draw related results
         fig, (ax0, ax1, ax2) = plt.subplots(1,3)
@@ -168,4 +187,19 @@ for echo_index1 in range(echoes_total_num):
         plt.tight_layout()
         # plt.show()
         print("optimal number of PCs: " + str(m_star) + " optimal IDiff: " + str(Idiff_opt) + "%")
-        plt.savefig(result_path + "Result_with_echo_" + str_echo_index1 + "&" + str_echo_index2 + ".jpg")
+        plt.savefig(os.path.join(result_path, "Result_with_echo_" + str_echo_index1 + "&" + str_echo_index2 + ".jpg"))
+
+# Get final result of reconstructed FCs and save those results.
+# FC Need to divide by # of echoes because of overlaps.
+echoes_FCs_recon /= echoes_total_num
+recon_FC_root_path = os.path.join(result_path, "reconstructed FCs")
+if not os.path.exists(recon_FC_root_path):
+    os.mkdir(recon_FC_root_path)
+
+print("saving reconstructed FCs...")
+for echo_index in tqdm(range(echoes_total_num), leave=False):
+    for subject_index in tqdm(range(subjects_total_num), leave=False):
+        FC_recon = echoes_FCs_recon[echo_index, subject_index]
+        recon_FC_path = os.path.join(recon_FC_root_path, "subject-" + str(subject_index) + "_echo" + str(echo_index))
+        np.savetxt(recon_FC_path, FC_recon)
+print("succeed.")

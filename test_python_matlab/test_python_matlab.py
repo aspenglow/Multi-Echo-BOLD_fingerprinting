@@ -115,4 +115,4 @@ for i in range(subjects_total_num):
 Ident_mat_recon_opt_matlab = scio.loadmat(os.path.join(data_path, 'Ident_mat_recon_opt.mat')).get("Ident_mat_recon_opt")
 assert(np.mean(np.abs(Ident_mat_recon_opt - Ident_mat_recon_opt_matlab)) < 1e-6)
 
-print("success")
+print("succeed.")
