@@ -1,4 +1,6 @@
 data/*
 fingerprinting/*.ipynb
-fingerprinting/results/*
+fingerprinting/results*
 *.zip
+data0/
+fingerprinting/split_TS.py
