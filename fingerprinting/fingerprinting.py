@@ -103,10 +103,12 @@ echoes_FCs_front_recon = np.zeros(echoes_FCs_shape)
 echoes_FCs_back_recon = np.zeros(echoes_FCs_shape)
 opt_FCs_front_recon = np.zeros(opt_FCs_shape)
 opt_FCs_back_recon = np.zeros(opt_FCs_shape)
-# Initialize optimal Idiff_matrix. 
-# #dims: 0: echo_front index.  1: echo_back index.  Idiff_matrix[i,j]: optimal Idiff for echo_front i, echo_back j
-Idiff_matrix = np.zeros((echoes_total_num, echoes_total_num), dtype=float)
-opt_comb_Idiff = np.zeros((1, 1), dtype=float)
+# Initialize optimal Idiff matrix. 
+# #dims: 0: echo_front index.  1: echo_back index.  Idiff_opt_matrix[i,j]: optimal Idiff for echo_front i, echo_back j
+Idiff_orig_matrix = np.zeros((echoes_total_num, echoes_total_num), dtype=float)
+Idiff_opt_matrix = np.zeros((echoes_total_num, echoes_total_num), dtype=float)
+opt_comb_Idiff_orig = np.zeros((1, 1), dtype=float)
+opt_comb_Idiff_opt = np.zeros((1, 1), dtype=float)
 
 echo_pair_result_path = os.path.join(result_path, "echo_pair_results")
 if not os.path.exists(echo_pair_result_path):
@@ -148,6 +150,10 @@ for echo_index_front in range(echoes_total_num+1): # Another echo_index: for opt
         Iself_orig = np.mean(Ident_mat_orig[mask_diag])
         Iothers_orig = np.mean(Ident_mat_orig[~mask_diag])
         Idiff_orig = (Iself_orig - Iothers_orig) * 100
+        if is_opt_comb:
+            opt_comb_Idiff_orig[0,0] = Idiff_orig
+        else:
+            Idiff_orig_matrix[echo_index_front, echo_index_back] = Idiff_orig
 
         # Differential Identifiability (Idiff) evaluation of PCA decomposition into FC-modes
         # Use PCA method to reconstruct original matrix with diffrent number of principle components.
@@ -187,9 +193,9 @@ for echo_index_front in range(echoes_total_num+1): # Another echo_index: for opt
         # Identifiability matrix at optimal reconstruction
         Idiff_opt = np.max(Idiff_recon)
         if is_opt_comb:
-            opt_comb_Idiff[0, 0] = Idiff_opt
+            opt_comb_Idiff_opt[0, 0] = Idiff_opt
         else:
-            Idiff_matrix[echo_index_front, echo_index_back] = Idiff_opt # Save Idiff_opt into Idiff_matrix 
+            Idiff_opt_matrix[echo_index_front, echo_index_back] = Idiff_opt # Save Idiff_opt into Idiff_opt_matrix 
         
         m_star = PCA_comps_range[Idiff_recon == Idiff_opt][0]
         pca = PCA(n_components=m_star)
@@ -232,6 +238,7 @@ for echo_index_front in range(echoes_total_num+1): # Another echo_index: for opt
             else:
                 FC_front_orig = echoes_FCs_front[echo_index_front, subject_index]
                 FC_back_orig = echoes_FCs_back[echo_index_back, subject_index]
+            
             vmin = min(np.min(FC_front_orig), np.min(FC_front_recon))
             vmax = max(np.max(FC_front_orig), np.max(FC_front_recon))
             norm = colors.Normalize(vmin=vmin, vmax=vmax)
@@ -244,8 +251,8 @@ for echo_index_front in range(echoes_total_num+1): # Another echo_index: for opt
             ax0.set_title('Original FC', fontdict=font)
             ax0.invert_yaxis()
             ax0.set_aspect('equal', adjustable='box')
-            ax0.set_xlabel('Subjects (echo ' + str_echo_index_back + ')', fontdict=font) 
-            ax0.set_ylabel('Subjects (echo ' + str_echo_index_front + ')', fontdict=font)
+            ax0.set_xlabel('Brain regions', fontdict=font) 
+            ax0.set_ylabel('Brain regions', fontdict=font)
             ax0.set_xticks([])
             ax0.set_yticks([])
             ax0.spines['top'].set_position(('data', 0))
@@ -255,8 +262,8 @@ for echo_index_front in range(echoes_total_num+1): # Another echo_index: for opt
             ax1.set_title('Recontructed FC with echo pair ' + str_echo_index_front + "&" + str_echo_index_back, fontdict=font)
             ax1.invert_yaxis()
             ax1.set_aspect('equal', adjustable='box')
-            ax1.set_xlabel('Subjects (echo ' + str_echo_index_back + ')', fontdict=font) 
-            ax1.set_ylabel('Subjects (echo ' + str_echo_index_front + ')', fontdict=font)
+            ax1.set_xlabel('Brain regions', fontdict=font) 
+            ax1.set_ylabel('Brain regions', fontdict=font)
             ax1.set_xticks([])
             ax1.set_yticks([])
             cb = fig.colorbar(c, ax=[ax0, ax1], orientation='vertical')
@@ -295,15 +302,15 @@ for echo_index_front in range(echoes_total_num+1): # Another echo_index: for opt
         left, bottom, width, height = -0.01, 0.55, 0.4, 0.4
         ax0 = fig.add_axes([left, bottom, width, height])
         c0 = ax0.pcolor(Ident_mat_orig, norm=norm)
-        ax0.set_title('original Ident matrix', fontdict=font)
+        ax0.set_title('Original Ident Matrix', fontdict=font)
         ax0.invert_yaxis()
         ax0.set_aspect('equal', adjustable='box')
         if is_opt_comb:
-            ax0.set_xlabel('Subjects (optimal combination front)', fontdict=font) 
-            ax0.set_ylabel('Subjects (optimal combination back)', fontdict=font)
+            ax0.set_xlabel('Optimal combination test', fontdict=font) 
+            ax0.set_ylabel('Optimal combination retest', fontdict=font)
         else:
-            ax0.set_xlabel('Subjects (echo ' + str_echo_index_front + ' front)', fontdict=font) 
-            ax0.set_ylabel('Subjects (echo ' + str_echo_index_back + ' back)', fontdict=font)
+            ax0.set_xlabel('Echo ' + str_echo_index_front + ' test', fontdict=font) 
+            ax0.set_ylabel('Echo ' + str_echo_index_back + ' retest', fontdict=font)
         ax0.set_xticks([])
         ax0.set_yticks([])
         ax0.spines['top'].set_position(('data', 0))
@@ -317,8 +324,8 @@ for echo_index_front in range(echoes_total_num+1): # Another echo_index: for opt
         ax1.set_aspect('equal', adjustable='box')
         ax1.set_aspect('equal', adjustable='box')
         if is_opt_comb:
-            ax1.set_xlabel('Subjects (optimal combination front)', fontdict=font) 
-            ax1.set_ylabel('Subjects (optimal combination back)', fontdict=font)
+            ax1.set_xlabel('Optimal combination test', fontdict=font) 
+            ax1.set_ylabel('Optimal combination retest', fontdict=font)
         else:
             ax1.set_xlabel('Subjects (echo ' + str_echo_index_front + ' front)', fontdict=font) 
             ax1.set_ylabel('Subjects (echo ' + str_echo_index_back + ' back)', fontdict=font)
@@ -360,48 +367,71 @@ for echo_index_front in range(echoes_total_num+1): # Another echo_index: for opt
             plt.savefig(os.path.join(echo_pair_result_path, "Result_with_echo_" + str_echo_index_front + "&" + str_echo_index_back + ".jpg"))
         plt.close()
 
-# Save optimal Idiff_matrix results. 
-Idiff_matrix_root_path = os.path.join(result_path, "optimal_Idiff_matrix")
-if not os.path.exists(Idiff_matrix_root_path):
-    os.mkdir(Idiff_matrix_root_path)
+# Save Idiff_orig_matrix and Idiff_opt_matrix results. 
+Idiff_opt_matrix_root_path = os.path.join(result_path, "optimal_Idiff_opt_matrix")
+if not os.path.exists(Idiff_opt_matrix_root_path):
+    os.mkdir(Idiff_opt_matrix_root_path)
 
-Idiff_min = min(np.min(Idiff_matrix),opt_comb_Idiff[0,0])
-Idiff_max = max(np.max(Idiff_matrix),opt_comb_Idiff[0,0])
+Idiff_min = min(np.min(Idiff_opt_matrix),opt_comb_Idiff_opt[0,0],np.min(Idiff_orig_matrix),opt_comb_Idiff_orig[0,0])
+Idiff_max = max(np.max(Idiff_opt_matrix),opt_comb_Idiff_opt[0,0],np.max(Idiff_orig_matrix),opt_comb_Idiff_orig[0,0])
 norm = colors.Normalize(vmin=Idiff_min, vmax=Idiff_max)
 fig = plt.figure(figsize=(18,10), dpi=100)
 font = {'size':20}
 
 fig.dpi = 100
-left, bottom, width, height = 0.4, 0.3, 0.4, 0.4
+left, bottom, width, height = 0.4, 0.55, 0.4, 0.4
 ax0 = fig.add_axes([left, bottom, width, height])
-X, Y = np.meshgrid(np.arange(echoes_total_num)+0.5, np.arange(echoes_total_num)+0.5)
-c0 = ax0.pcolor(Idiff_matrix, norm=norm)
-ax0.set_title('Idiff matrix', fontdict=font)
+c0 = ax0.pcolor(Idiff_orig_matrix, norm=norm)
+ax0.set_title('Original Idiff Matrix', fontdict=font)
 ax0.invert_yaxis()
 ax0.set_aspect('equal', adjustable='box')
-ax0.set_xlabel('Echo ' + str_echo_index_front + '(front)', fontdict=font) 
-ax0.set_ylabel('Echo ' + str_echo_index_back + '(back)', fontdict=font)
-# ax0.xaxis.set_major_locator(MaxNLocator(integer=True))
-# ax0.yaxis.set_major_locator(MaxNLocator(integer=True))
+ax0.set_xlabel('Echoes (test)', fontdict=font) 
+ax0.set_ylabel('Echoes (retest)', fontdict=font)
 ax0.set_xticks([])
 ax0.set_yticks([])
 
-left, bottom, width, height = 0.2, 0.4, 0.15, 0.15
+left, bottom, width, height = 0.23, 0.65, 0.15, 0.15
 ax1 = fig.add_axes([left, bottom, width, height])
-c1 = ax1.pcolor(opt_comb_Idiff, norm=norm)
-ax1.set_title('Optimal Combination Idiff')
+c1 = ax1.pcolor(opt_comb_Idiff_orig, norm=norm)
+ax1.set_title('Original Optimal Combination Idiff')
 ax1.invert_yaxis()
 ax1.set_aspect('equal', adjustable='box')
 ax1.set_xticks([])
 ax1.set_yticks([])
 
-fig.colorbar(c0, ax=[ax0,ax1], orientation='vertical')
-plt.savefig(os.path.join(Idiff_matrix_root_path, "optimal_Idiff_matrix.jpg"))
+left, bottom, width, height = 0.4, 0.05, 0.4, 0.4
+ax2 = fig.add_axes([left, bottom, width, height])
+c2 = ax2.pcolor(Idiff_opt_matrix, norm=norm)
+ax2.set_title('Maximum Idiff Matrix', fontdict=font)
+ax2.invert_yaxis()
+ax2.set_aspect('equal', adjustable='box')
+ax2.set_xlabel('Echoes (test)', fontdict=font) 
+ax2.set_ylabel('Echoes (retest)', fontdict=font)
+ax2.set_xticks([])
+ax2.set_yticks([])
+
+left, bottom, width, height = 0.23, 0.15, 0.15, 0.15
+ax3 = fig.add_axes([left, bottom, width, height])
+c1 = ax3.pcolor(opt_comb_Idiff_opt, norm=norm)
+ax3.set_title('Maximum Optimal Combination Idiff')
+ax3.invert_yaxis()
+ax3.set_aspect('equal', adjustable='box')
+ax3.set_xticks([])
+ax3.set_yticks([])
+
+fig.colorbar(c0, ax=[ax0,ax1,ax2,ax3], orientation='vertical')
+plt.savefig(os.path.join(Idiff_opt_matrix_root_path, "optimal_Idiff_opt_matrix.jpg"))
 plt.close()
   
+print("Idiff original matrix:")
+print(Idiff_orig_matrix)
+print("Idiff optimal matrix:")
+print(Idiff_opt_matrix)
+
 # Get final result of reconstructed FCs and save those results.
 # FC Need to divide by # of echoes because of overlaps.
 echoes_FCs_front_recon /= echoes_total_num
+echoes_FCs_back_recon /= echoes_total_num
     
 # Save average of original FCs and reconstructed FCs of subjects
 FC_avg_img_path = os.path.join(result_path, "average_FCs")
@@ -430,6 +460,8 @@ for echo_index in range(echoes_total_num):
     ax0.set_title('Original FC average', fontdict=font)
     ax0.invert_yaxis()
     ax0.set_aspect('equal', adjustable='box')
+    ax0.set_xlabel('Brain regions', fontdict=font) 
+    ax0.set_ylabel('Brain regions', fontdict=font)
     ax0.set_xticks([])
     ax0.set_yticks([])
     ax0.spines['top'].set_position(('data', 0))
@@ -439,9 +471,8 @@ for echo_index in range(echoes_total_num):
     ax1.set_title('Recontructed FC average', fontdict=font)
     ax1.invert_yaxis()
     ax1.set_aspect('equal', adjustable='box')
-    ax1.set_aspect('equal', adjustable='box')
-    ax1.set_xlabel('Subjects (echo ' + str_echo_index_back + ')', fontdict=font) 
-    ax1.set_ylabel('Subjects (echo ' + str_echo_index_front + ')', fontdict=font)
+    ax1.set_xlabel('Brain regions', fontdict=font) 
+    ax1.set_ylabel('Brain regions', fontdict=font)
     ax1.set_xticks([])
     ax1.set_yticks([])
     cb = fig.colorbar(c, ax=[ax0, ax1], orientation='vertical')
