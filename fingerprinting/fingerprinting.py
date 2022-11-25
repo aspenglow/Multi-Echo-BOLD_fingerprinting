@@ -7,9 +7,20 @@ from matplotlib import colors
 import seaborn as sns
 from scipy.stats import pearsonr
 from tqdm import tqdm
+import argparse
+from utils import ICC
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='PCA denoising with spliting timeseries to test and retest.')
+    parser.add_argument('--data_path', default="./data",
+                        help='path of the timeseries.')
+    parser.add_argument('--result_path', default="./fingerprinting/results",
+                        help='sum the integers (default: find the max)')
+    args = parser.parse_args()
+    return args
 
 ### Set global variables.
-data_path = "./data0"
+data_path = "./data"
 result_path = "./fingerprinting/results"
 echoes_total_num = 4
 subjects_total_num = int(len(os.listdir(data_path)) / (echoes_total_num + 1)) # there is another optimal TS.
@@ -62,47 +73,55 @@ for file in tqdm(data_lists, desc='data', leave=False):
         echoes_FCs_shape = (echoes_total_num, subjects_total_num, FC_side_length, FC_side_length)
         echoes_FCs_front = np.zeros(echoes_FCs_shape)
         echoes_FCs_back = np.zeros(echoes_FCs_shape)
+        echoes_ICCs_shape = (echoes_total_num, FC_side_length, FC_side_length)
+        echoes_ICCs_front = np.zeros(echoes_ICCs_shape)
+        echoes_ICCs_back = np.zeros(echoes_ICCs_shape)
+        echoes_ICCs_front_recon = np.zeros(echoes_ICCs_shape)
+        echoes_ICCs_back_recon = np.zeros(echoes_ICCs_shape)
 
-        opt_FCs_shape = echoes_FCs_shape[1:]
-        opt_FCs_front = np.zeros(opt_FCs_shape)
-        opt_FCs_back = np.zeros(opt_FCs_shape)
+        optcomb_FCs_shape = echoes_FCs_shape[1:]
+        optcomb_FCs_front = np.zeros(optcomb_FCs_shape)
+        optcomb_FCs_back = np.zeros(optcomb_FCs_shape)
+        optcomb_ICCs_shape = echoes_ICCs_shape[1:]
+        optcomb_ICCs = np.zeros(optcomb_ICCs_shape)
+        optcomb_ICCs_recon = np.zeros(optcomb_ICCs_shape)
         
         echoes_orig_matrixs_shape = (echoes_total_num, orig_column_front.size, subjects_total_num)
         echoes_orig_matrixs_front = np.zeros(echoes_orig_matrixs_shape)
         echoes_orig_matrixs_back = np.zeros(echoes_orig_matrixs_shape)
         
-        opt_orig_matrixs_shape = echoes_orig_matrixs_shape[1:]
-        opt_orig_matrixs_front = np.zeros(opt_orig_matrixs_shape)
-        opt_orig_matrixs_back = np.zeros(opt_orig_matrixs_shape)
+        optcomb_orig_matrixs_shape = echoes_orig_matrixs_shape[1:]
+        optcomb_orig_matrixs_front = np.zeros(optcomb_orig_matrixs_shape)
+        optcomb_orig_matrixs_back = np.zeros(optcomb_orig_matrixs_shape)
 
     
     if is_opt_comb: # For optimal combination
         subject_index = echoes_count[0] - 1
-        opt_FCs_front[subject_index] = FC_front
-        opt_orig_matrixs_front[:, subject_index] = orig_column_front
-        opt_FCs_back[subject_index] = FC_back
-        opt_orig_matrixs_back[:,subject_index] = orig_column_back
+        optcomb_FCs_front[subject_index] = FC_front
+        optcomb_orig_matrixs_front[:, subject_index] = orig_column_front
+        optcomb_FCs_back[subject_index] = FC_back
+        optcomb_orig_matrixs_back[:,subject_index] = orig_column_back
     else:
         subject_index = echoes_count[echo_index]
         echoes_FCs_front[echo_index, subject_index] = FC_front
         echoes_orig_matrixs_front[echo_index, :, subject_index] = orig_column_front 
         echoes_FCs_back[echo_index, subject_index] = FC_back
-        echoes_orig_matrixs_back[echo_index, :, subject_index] = orig_column_back 
+        echoes_orig_matrixs_back[echo_index, :, subject_index] = orig_column_back
         echoes_count[echo_index] += 1
 
 # Don't need to manually demean the original matrix because when calculating PCA, the function will first demean it automatically.
 echoes_orig_matrixs_front_mean = np.mean(echoes_orig_matrixs_front, axis=1) # Calculate mean of each subject and echo
 echoes_orig_matrixs_back_mean = np.mean(echoes_orig_matrixs_back, axis=1)
-opt_orig_matrixs_front_mean = np.mean(opt_orig_matrixs_front, axis=0) 
-opt_orig_matrixs_back_mean = np.mean(opt_orig_matrixs_back, axis=0)
+optcomb_orig_matrixs_front_mean = np.mean(optcomb_orig_matrixs_front, axis=0) 
+optcomb_orig_matrixs_back_mean = np.mean(optcomb_orig_matrixs_back, axis=0)
 
 # Initialize reconstructed FC array.
 # echoes_FCs_front_recon: 4-dimensional array.
 #   dims:  0: echo_index.  1: subject index.  2,3: reconstructed FC matrixs
 echoes_FCs_front_recon = np.zeros(echoes_FCs_shape)
 echoes_FCs_back_recon = np.zeros(echoes_FCs_shape)
-opt_FCs_front_recon = np.zeros(opt_FCs_shape)
-opt_FCs_back_recon = np.zeros(opt_FCs_shape)
+optcomb_FCs_front_recon = np.zeros(optcomb_FCs_shape)
+optcomb_FCs_back_recon = np.zeros(optcomb_FCs_shape)
 # Initialize optimal Idiff matrix. 
 # #dims: 0: echo_front index.  1: echo_back index.  Idiff_opt_matrix[i,j]: optimal Idiff for echo_front i, echo_back j
 Idiff_orig_matrix = np.zeros((echoes_total_num, echoes_total_num), dtype=float)
@@ -125,8 +144,8 @@ for echo_index_front in range(echoes_total_num+1): # Another echo_index: for opt
             break
         if is_opt_comb: 
             print("Calculating result with optimal combination.")
-            orig_matrix_front = opt_orig_matrixs_front
-            orig_matrix_back = opt_orig_matrixs_back
+            orig_matrix_front = optcomb_orig_matrixs_front
+            orig_matrix_back = optcomb_orig_matrixs_back
         else:
             str_echo_index_front = str(echo_index_front+1)
             str_echo_index_back = str(echo_index_back+1)
@@ -144,7 +163,7 @@ for echo_index_front in range(echoes_total_num+1): # Another echo_index: for opt
         Ident_mat_orig = np.zeros((subjects_total_num, subjects_total_num))
         for i in range(subjects_total_num):
             for j in range(subjects_total_num):
-                Ident_mat_orig[i,j] = pearsonr(orig_matrix_front[:,i], orig_matrix_back[:,j]).statistic
+                Ident_mat_orig[i,j] = pearsonr(orig_matrix_back[:,i], orig_matrix_front[:,j]).statistic
 
         # Idiff computation, original Identifiability matrix
         Iself_orig = np.mean(Ident_mat_orig[mask_diag])
@@ -153,7 +172,7 @@ for echo_index_front in range(echoes_total_num+1): # Another echo_index: for opt
         if is_opt_comb:
             opt_comb_Idiff_orig[0,0] = Idiff_orig
         else:
-            Idiff_orig_matrix[echo_index_front, echo_index_back] = Idiff_orig
+            Idiff_orig_matrix[echo_index_back, echo_index_front] = Idiff_orig
 
         # Differential Identifiability (Idiff) evaluation of PCA decomposition into FC-modes
         # Use PCA method to reconstruct original matrix with diffrent number of principle components.
@@ -171,8 +190,8 @@ for echo_index_front in range(echoes_total_num+1): # Another echo_index: for opt
             # Add mean to each column of reconstructed matrix.
             if is_opt_comb:
                 for subject_index in range(subjects_total_num):
-                    recon_matrix[:, 2*subject_index] += opt_orig_matrixs_front_mean[subject_index]
-                    recon_matrix[:, 2*subject_index+1] += opt_orig_matrixs_back_mean[subject_index]
+                    recon_matrix[:, 2*subject_index] += optcomb_orig_matrixs_front_mean[subject_index]
+                    recon_matrix[:, 2*subject_index+1] += optcomb_orig_matrixs_back_mean[subject_index]
             else:
                 for subject_index in range(subjects_total_num):
                     recon_matrix[:, 2*subject_index] += echoes_orig_matrixs_front_mean[echo_index_front, subject_index]
@@ -184,7 +203,7 @@ for echo_index_front in range(echoes_total_num+1): # Another echo_index: for opt
             Ident_mat_recon = np.zeros((subjects_total_num, subjects_total_num))
             for i in range(subjects_total_num):
                 for j in range(subjects_total_num):
-                    Ident_mat_recon[i,j] = pearsonr(recon_matrix_front[:,i], recon_matrix_back[:,j]).statistic
+                    Ident_mat_recon[i,j] = pearsonr(recon_matrix_back[:,i], recon_matrix_front[:,j]).statistic
             # Idiff computation, reconstructed FCs
             Iself_recon = np.mean(Ident_mat_recon[mask_diag])
             Iothers_recon = np.mean(Ident_mat_recon[~mask_diag])
@@ -195,18 +214,17 @@ for echo_index_front in range(echoes_total_num+1): # Another echo_index: for opt
         if is_opt_comb:
             opt_comb_Idiff_opt[0, 0] = Idiff_opt
         else:
-            Idiff_opt_matrix[echo_index_front, echo_index_back] = Idiff_opt # Save Idiff_opt into Idiff_opt_matrix 
+            Idiff_opt_matrix[echo_index_back, echo_index_front] = Idiff_opt # Save Idiff_opt into Idiff_opt_matrix 
         
         m_star = PCA_comps_range[Idiff_recon == Idiff_opt][0]
-        pca = PCA(n_components=m_star)
-        recon_matrix_opt = pca.inverse_transform(pca.fit_transform(orig_matrix))
+        recon_matrix_opt = np.dot(projected_FC_modes[:,0:m_star], FC_modes[:,0:m_star].transpose())
         recon_matrix_opt_front = recon_matrix_opt[:,0::2]
         recon_matrix_opt_back = recon_matrix_opt[:,1::2]
         # Compute Recon Identifiability matrix at optimal point
         Ident_mat_recon_opt = np.zeros((subjects_total_num, subjects_total_num))
         for i in range(subjects_total_num):
             for j in range(subjects_total_num):
-                Ident_mat_recon_opt[i,j] = pearsonr(recon_matrix_opt_front[:,i], recon_matrix_opt_back[:,j]).statistic
+                Ident_mat_recon_opt[i,j] = pearsonr(recon_matrix_opt_back[:,i], recon_matrix_opt_front[:,j]).statistic
 
         # Reconstruct FC from recon_matrix
         # Each FC will have overlaps with # of echoes. We consider to average those overlaps. 
@@ -224,8 +242,8 @@ for echo_index_front in range(echoes_total_num+1): # Another echo_index: for opt
             FC_back_recon[mask] = recon_matrix_opt_back[:,subject_index]
 
             if is_opt_comb:
-                opt_FCs_front_recon[subject_index] = FC_front_recon
-                opt_FCs_back_recon[subject_index] = FC_back_recon
+                optcomb_FCs_front_recon[subject_index] = FC_front_recon
+                optcomb_FCs_back_recon[subject_index] = FC_back_recon
             else:
                 # Each FC will have overlaps with # of echoes. Need to divide by it in the end.
                 echoes_FCs_front_recon[echo_index_front][subject_index] += FC_front_recon
@@ -233,8 +251,8 @@ for echo_index_front in range(echoes_total_num+1): # Another echo_index: for opt
             
             # Save reconstructed FC by each echo pair.
             if is_opt_comb:
-                FC_front_orig = opt_FCs_front[subject_index]
-                FC_back_orig = opt_FCs_back[subject_index]
+                FC_front_orig = optcomb_FCs_front[subject_index]
+                FC_back_orig = optcomb_FCs_back[subject_index]
             else:
                 FC_front_orig = echoes_FCs_front[echo_index_front, subject_index]
                 FC_back_orig = echoes_FCs_back[echo_index_back, subject_index]
@@ -298,7 +316,7 @@ for echo_index_front in range(echoes_total_num+1): # Another echo_index: for opt
         norm = colors.Normalize(vmin=vmin, vmax=vmax)
 
         fig = plt.figure(figsize=(18,10), dpi=100)
-        font = {'size':20}
+        font = {'size':15}
         left, bottom, width, height = -0.01, 0.55, 0.4, 0.4
         ax0 = fig.add_axes([left, bottom, width, height])
         c0 = ax0.pcolor(Ident_mat_orig, norm=norm)
@@ -306,16 +324,15 @@ for echo_index_front in range(echoes_total_num+1): # Another echo_index: for opt
         ax0.invert_yaxis()
         ax0.set_aspect('equal', adjustable='box')
         if is_opt_comb:
-            ax0.set_xlabel('Optimal combination test', fontdict=font) 
-            ax0.set_ylabel('Optimal combination retest', fontdict=font)
+            ax0.set_xlabel('Subjects (opt comb test)', fontdict=font) 
+            ax0.set_ylabel('Subjects (opt comb retest)', fontdict=font)
         else:
-            ax0.set_xlabel('Echo ' + str_echo_index_front + ' test', fontdict=font) 
-            ax0.set_ylabel('Echo ' + str_echo_index_back + ' retest', fontdict=font)
+            ax0.set_xlabel('Subjects (echo ' + str_echo_index_front + ' test)', fontdict=font) 
+            ax0.set_ylabel('Subjects (echo ' + str_echo_index_back + ' retest)', fontdict=font)
         ax0.set_xticks([])
         ax0.set_yticks([])
         ax0.spines['top'].set_position(('data', 0))
 
-        # ax1 = plt.subplot2grid((2,3), (1,0))
         left, bottom, width, height = -0.01, 0.05, 0.4, 0.4
         ax1 = fig.add_axes([left, bottom, width, height])
         c1 = ax1.pcolor(Ident_mat_recon_opt, norm=norm)
@@ -324,11 +341,11 @@ for echo_index_front in range(echoes_total_num+1): # Another echo_index: for opt
         ax1.set_aspect('equal', adjustable='box')
         ax1.set_aspect('equal', adjustable='box')
         if is_opt_comb:
-            ax1.set_xlabel('Optimal combination test', fontdict=font) 
-            ax1.set_ylabel('Optimal combination retest', fontdict=font)
+            ax1.set_xlabel('Subjects (opt comb test)', fontdict=font) 
+            ax1.set_ylabel('Subjects (opt comb retest)', fontdict=font)
         else:
-            ax1.set_xlabel('Subjects (echo ' + str_echo_index_front + ' front)', fontdict=font) 
-            ax1.set_ylabel('Subjects (echo ' + str_echo_index_back + ' back)', fontdict=font)
+            ax1.set_xlabel('Subjects (echo ' + str_echo_index_front + ' test)', fontdict=font) 
+            ax1.set_ylabel('Subjects (echo ' + str_echo_index_back + ' retest)', fontdict=font)
         ax1.set_xticks([])
         ax1.set_yticks([])
         cb = fig.colorbar(c0, ax=[ax0, ax1], orientation='vertical')
@@ -348,8 +365,8 @@ for echo_index_front in range(echoes_total_num+1): # Another echo_index: for opt
         ax2.set_xlabel('Number of PCA components',fontdict=font)
         ax2.set_ylabel('IDiff (%)',fontdict=font)
         
-        fig.text(0.4,0.55,"m_star="+str(m_star),fontdict={'size':20})
-        fig.text(0.4,0.5,"Idiff_opt="+str(Idiff_opt)[:6]+"%",fontdict={'size':20})
+        fig.text(0.7,0.75,"m_star="+str(m_star),fontdict={'size':20})
+        fig.text(0.7,0.7,"Idiff_opt="+str(Idiff_opt)[:6]+"%",fontdict={'size':20})
 
         left, bottom, width, height = 0.55, 0.05, 0.4, 0.4
         ax3 = fig.add_axes([left, bottom, width, height])
@@ -393,7 +410,7 @@ ax0.set_yticks([])
 left, bottom, width, height = 0.23, 0.65, 0.15, 0.15
 ax1 = fig.add_axes([left, bottom, width, height])
 c1 = ax1.pcolor(opt_comb_Idiff_orig, norm=norm)
-ax1.set_title('Original Optimal Combination Idiff')
+ax1.set_title('Original Optimal Comb Idiff', fontdict=font)
 ax1.invert_yaxis()
 ax1.set_aspect('equal', adjustable='box')
 ax1.set_xticks([])
@@ -402,7 +419,7 @@ ax1.set_yticks([])
 left, bottom, width, height = 0.4, 0.05, 0.4, 0.4
 ax2 = fig.add_axes([left, bottom, width, height])
 c2 = ax2.pcolor(Idiff_opt_matrix, norm=norm)
-ax2.set_title('Maximum Idiff Matrix', fontdict=font)
+ax2.set_title('After PCA denoising', fontdict=font)
 ax2.invert_yaxis()
 ax2.set_aspect('equal', adjustable='box')
 ax2.set_xlabel('Echoes (test)', fontdict=font) 
@@ -413,27 +430,30 @@ ax2.set_yticks([])
 left, bottom, width, height = 0.23, 0.15, 0.15, 0.15
 ax3 = fig.add_axes([left, bottom, width, height])
 c1 = ax3.pcolor(opt_comb_Idiff_opt, norm=norm)
-ax3.set_title('Maximum Optimal Combination Idiff')
+ax3.set_title('After PCA denoising', fontdict=font)
 ax3.invert_yaxis()
 ax3.set_aspect('equal', adjustable='box')
 ax3.set_xticks([])
 ax3.set_yticks([])
 
-fig.colorbar(c0, ax=[ax0,ax1,ax2,ax3], orientation='vertical')
+cb = fig.colorbar(c0, ax=[ax0,ax1,ax2,ax3], orientation='vertical')
+cb.ax.tick_params(labelsize=15)
 plt.savefig(os.path.join(Idiff_opt_matrix_root_path, "optimal_Idiff_opt_matrix.jpg"))
 plt.close()
   
 print("Idiff original matrix:")
 print(Idiff_orig_matrix)
+print("Original Original Comb Idiff" + str(opt_comb_Idiff_orig))
 print("Idiff optimal matrix:")
 print(Idiff_opt_matrix)
+print("Original Optimal Comb Idiff" + str(opt_comb_Idiff_opt))
 
 # Get final result of reconstructed FCs and save those results.
 # FC Need to divide by # of echoes because of overlaps.
 echoes_FCs_front_recon /= echoes_total_num
 echoes_FCs_back_recon /= echoes_total_num
     
-# Save average of original FCs and reconstructed FCs of subjects
+# # Save average of original FCs and reconstructed FCs of subjects
 FC_avg_img_path = os.path.join(result_path, "average_FCs")
 if not os.path.exists(FC_avg_img_path):
     os.mkdir(FC_avg_img_path)
@@ -492,4 +512,157 @@ for echo_index in range(echoes_total_num):
     plt.savefig(FC_avg_back_path)
     plt.close()
    
+# Compute edgewise ICC with original and optimal reconstruction.
+ICC_path = os.path.join(result_path, "ICC")
+if not os.path.exists(ICC_path):
+    os.mkdir(ICC_path)
+
+for echoes_index in tqdm(range(echoes_total_num+1), leave=False):
+    for brain_region_1 in range(FC_side_length):
+        for brain_region_2 in range(FC_side_length):
+            is_opt_comb = echoes_index == echoes_total_num 
+            if is_opt_comb: 
+                edgewise_front = optcomb_FCs_front[:, brain_region_1, brain_region_2]
+                (r_front, _, _, _, _, _, _) = ICC(edgewise_front[np.newaxis, :])
+                optcomb_ICCs[brain_region_1, brain_region_2] = r_front
+                edgewise_back = optcomb_FCs_back[:, brain_region_1, brain_region_2]
+                (r_back, _, _, _, _, _, _) = ICC(edgewise_back[np.newaxis, :])
+                optcomb_ICCs_back[brain_region_1, brain_region_2] = r_back
+
+                edgewise_front = optcomb_FCs_front_recon[:, brain_region_1, brain_region_2]
+                (r_front, _, _, _, _, _, _) = ICC(edgewise_front[np.newaxis, :])
+                optcomb_ICCs_recon[brain_region_1, brain_region_2] = r_front
+                edgewise_back = optcomb_FCs_back[:, brain_region_1, brain_region_2]
+                (r_back, _, _, _, _, _, _) = ICC(edgewise_back[np.newaxis, :])
+                optcomb_ICCs_back_recon[brain_region_1, brain_region_2] = r_back
+
+            else:
+                edgewise_front = echoes_FCs_front[echoes_index, :, brain_region_1, brain_region_2]
+                (r_front, _, _, _, _, _, _) = ICC(edgewise_front[np.newaxis, :])
+                echoes_ICCs_front[echoes_index, brain_region_1, brain_region_2] = r_front
+                edgewise_back = echoes_FCs_back[echoes_index, :, brain_region_1, brain_region_2]
+                (r_back, _, _, _, _, _, _) = ICC(edgewise_back[np.newaxis, :])
+                echoes_ICCs_back[echoes_index, brain_region_1, brain_region_2] = r_back
+
+                edgewise_front = echoes_FCs_front_recon[echoes_index, :, brain_region_1, brain_region_2]
+                (r_front, _, _, _, _, _, _) = ICC(edgewise_front[np.newaxis, :])
+                echoes_ICCs_front_recon[echoes_index, brain_region_1, brain_region_2] = r_front
+                edgewise_back = echoes_FCs_back_recon[echoes_index, :, brain_region_1, brain_region_2]
+                (r_back, _, _, _, _, _, _) = ICC(edgewise_back[np.newaxis, :])
+                echoes_ICCs_back_recon[echoes_index, brain_region_1, brain_region_2] = r_back
+
+for echoes_index in range(echoes_total_num+1):
+    norm = colors.Normalize(vmin=-0.3, vmax=1)
+    is_opt_comb = echoes_index == echoes_total_num 
+    if is_opt_comb: 
+        fig = plt.figure(figsize=(18,10), dpi=100)
+        font = {'size':20}
+
+        fig.dpi = 100
+        left, bottom, width, height = 0.0, 0.55, 0.4, 0.4
+        ax0 = fig.add_axes([left, bottom, width, height])
+        c0 = ax0.pcolor(optcomb_ICCs, norm=norm)
+        ax0.set_title('ICC - Opt comb test Orig', fontdict=font)
+        ax0.invert_yaxis()
+        ax0.set_aspect('equal', adjustable='box')
+        ax0.set_xlabel('Brain regions', fontdict=font) 
+        ax0.set_ylabel('Brain regions', fontdict=font)
+        ax0.set_xticks([])
+        ax0.set_yticks([])
+
+        left, bottom, width, height = 0.55, 0.55, 0.4, 0.4
+        ax1 = fig.add_axes([left, bottom, width, height])
+        c1 = ax1.pcolor(optcomb_ICCs_recon, norm=norm)
+        ax1.set_title('ICC - Opt comb test Recon', fontdict=font)
+        ax1.invert_yaxis()
+        ax1.set_aspect('equal', adjustable='box')
+        ax1.set_xlabel('Brain regions', fontdict=font) 
+        ax1.set_ylabel('Brain regions', fontdict=font)
+        ax1.set_xticks([])
+        ax1.set_yticks([])
+
+        left, bottom, width, height = 0.0, 0.05, 0.4, 0.4
+        ax2 = fig.add_axes([left, bottom, width, height])
+        c2 = ax2.pcolor(optcomb_ICCs_back, norm=norm)
+        ax2.set_title('ICC - Opt comb retest Orig', fontdict=font)
+        ax2.invert_yaxis()
+        ax2.set_aspect('equal', adjustable='box')
+        ax2.set_xlabel('Brain regions', fontdict=font) 
+        ax2.set_ylabel('Brain regions', fontdict=font)
+        ax2.set_xticks([])
+        ax2.set_yticks([])
+
+        left, bottom, width, height = 0.55, 0.05, 0.4, 0.4
+        ax3 = fig.add_axes([left, bottom, width, height])
+        c3 = ax3.pcolor(optcomb_ICCs_back_recon, norm=norm)
+        ax3.set_title('ICC - Opt comb retest Recon', fontdict=font)
+        ax3.invert_yaxis()
+        ax3.set_aspect('equal', adjustable='box')
+        ax3.set_xlabel('Brain regions', fontdict=font) 
+        ax3.set_ylabel('Brain regions', fontdict=font)
+        ax3.set_xticks([])
+        ax3.set_yticks([])
+        cb = fig.colorbar(c0, ax=[ax0,ax1,ax2,ax3], orientation='vertical')
+        cb.ax.tick_params(labelsize=15)
+        plt.savefig(os.path.join(ICC_path, "ICC_opt_comb.jpg"))
+        plt.close()
+    else: 
+        ICCs_min = min(np.min(echoes_ICCs_front[echoes_index]), np.min(echoes_ICCs_back[echoes_index]), 
+                np.min(echoes_ICCs_front_recon[echoes_index]), np.min(echoes_ICCs_back_recon[echoes_index]))
+        ICCs_max = max(np.max(echoes_ICCs_front[echoes_index]), np.max(echoes_ICCs_back[echoes_index]), 
+                np.max(echoes_ICCs_front_recon[echoes_index]), np.max(echoes_ICCs_back_recon[echoes_index]))
+        
+        norm = colors.Normalize(vmin=ICCs_min, vmax=ICCs_max)
+        fig = plt.figure(figsize=(18,10), dpi=100)
+        font = {'size':20}
+
+        fig.dpi = 100
+        left, bottom, width, height = 0.0, 0.55, 0.4, 0.4
+        ax0 = fig.add_axes([left, bottom, width, height])
+        c0 = ax0.pcolor(echoes_ICCs_front[echoes_index], norm=norm)
+        ax0.set_title('ICC - echo ' + str(echoes_index+1) + ' test Orig', fontdict=font)
+        ax0.invert_yaxis()
+        ax0.set_aspect('equal', adjustable='box')
+        ax0.set_xlabel('Brain regions', fontdict=font) 
+        ax0.set_ylabel('Brain regions', fontdict=font)
+        ax0.set_xticks([])
+        ax0.set_yticks([])
+
+        left, bottom, width, height = 0.55, 0.55, 0.4, 0.4
+        ax1 = fig.add_axes([left, bottom, width, height])
+        c1 = ax1.pcolor(echoes_ICCs_front_recon[echoes_index], norm=norm)
+        ax1.set_title('ICC - echo ' + str(echoes_index+1) + ' test Recon', fontdict=font)
+        ax1.invert_yaxis()
+        ax1.set_aspect('equal', adjustable='box')
+        ax1.set_xlabel('Brain regions', fontdict=font) 
+        ax1.set_ylabel('Brain regions', fontdict=font)
+        ax1.set_xticks([])
+        ax1.set_yticks([])
+
+        left, bottom, width, height = 0.0, 0.05, 0.4, 0.4
+        ax2 = fig.add_axes([left, bottom, width, height])
+        c2 = ax2.pcolor(echoes_ICCs_back[echoes_index], norm=norm)
+        ax2.set_title('ICC - echo ' + str(echoes_index+1) + ' retest Orig', fontdict=font)
+        ax2.invert_yaxis()
+        ax2.set_aspect('equal', adjustable='box')
+        ax2.set_xlabel('Brain regions', fontdict=font) 
+        ax2.set_ylabel('Brain regions', fontdict=font)
+        ax2.set_xticks([])
+        ax2.set_yticks([])
+
+        left, bottom, width, height = 0.55, 0.05, 0.4, 0.4
+        ax3 = fig.add_axes([left, bottom, width, height])
+        c3 = ax3.pcolor(echoes_ICCs_back_recon[echoes_index], norm=norm)
+        ax3.set_title('ICC - echo ' + str(echoes_index+1) + ' retest Recon', fontdict=font)
+        ax3.invert_yaxis()
+        ax3.set_aspect('equal', adjustable='box')
+        ax3.set_xlabel('Brain regions', fontdict=font) 
+        ax3.set_ylabel('Brain regions', fontdict=font)
+        ax3.set_xticks([])
+        ax3.set_yticks([])
+        cb = fig.colorbar(c0, ax=[ax0,ax1,ax2,ax3], orientation='vertical')
+        cb.ax.tick_params(labelsize=15)
+        plt.savefig(os.path.join(ICC_path, "ICC_echo " + str(echoes_index+1) + ".jpg"))
+        plt.close()
+
 print("succeed.")
