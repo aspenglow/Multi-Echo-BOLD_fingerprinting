@@ -269,3 +269,68 @@ def draw_Idiff_Iself_Iothers(image_path, Idiff_mat_orig, Idiff_mat_opt, Iself_ma
 
     plt.savefig(os.path.join(image_path, "Idiff_Iself_Iothers.jpg"))
     plt.close()
+
+def draw_echo_pairs_self_violin(image_path, self_elements_orig, self_elements_opt):
+    fig = plt.figure(figsize=(18,10), dpi=100)
+    font = {'size':20}
+    left, bottom, width, height = 0, 0.52, 1, 0.45
+    ax0 = fig.add_axes([left, bottom, width, height])
+    sns.violinplot([self_elements_orig[0], self_elements_orig[1], self_elements_orig[2], self_elements_orig[3], self_elements_orig[4], \
+                    self_elements_orig[5], self_elements_orig[6], self_elements_orig[7], self_elements_orig[8], self_elements_orig[9]])
+    ax0.set_title('Self Identifiabilities before PCA denoising', fontdict=font)
+    ax0.set_xticks([0,1,2,3,4,5,6,7,8,9])
+    ax0.set_xticklabels(["2-1", "3-1", "4-1", "oc-1", "3-2", "4-2", "oc-2", "4-3", "oc-3", "oc-4"])
+    ax0.tick_params(labelsize=15)
+    ax0.set_ylim(0, 1.3)
+
+    left, bottom, width, height = 0, 0.03, 1, 0.45
+    ax1 = fig.add_axes([left, bottom, width, height])
+    sns.violinplot([self_elements_opt[0], self_elements_opt[1], self_elements_opt[2], self_elements_opt[3], self_elements_opt[4], \
+                    self_elements_opt[5], self_elements_opt[6], self_elements_opt[7], self_elements_opt[8], self_elements_opt[9]])
+    ax1.set_title('Self Identifiabilities after PCA denoising', fontdict=font)
+    ax1.set_xticks([0,1,2,3,4,5,6,7,8,9])
+    ax1.set_xticklabels(["2-1", "3-1", "4-1", "oc-1", "3-2", "4-2", "oc-2", "4-3", "oc-3", "oc-4"])
+    ax1.tick_params(labelsize=15)
+    ax1.set_ylim(0, 1.3)
+
+    plt.savefig(os.path.join(image_path, "Self_identifiability_echopairs.jpg"))
+    plt.close()
+
+def draw_ICC(ICC_path, ICCs, ICCs_recon, echo_index, echo_optcomb):
+    ICCs_min = min(np.min(ICCs[echo_index]), np.min(ICCs_recon[echo_index]))
+    ICCs_max = max(np.max(ICCs[echo_index]), np.max(ICCs_recon[echo_index]))
+    
+    norm = colors.Normalize(vmin=ICCs_min, vmax=ICCs_max)
+    fig = plt.figure(figsize=(18,10), dpi=100)
+    font = {'size':20}
+
+    fig.dpi = 100
+    left, bottom, width, height = 0.05, 0.2, 0.4, 0.4
+    ax0 = fig.add_axes([left, bottom, width, height])
+    c0 = ax0.pcolor(ICCs[echo_index], norm=norm)
+    ax0.set_title('ICC - echo ' + str(echo_index+1) + ' test Orig', fontdict=font)
+    ax0.invert_yaxis()
+    ax0.set_aspect('equal', adjustable='box')
+    ax0.set_xlabel('Brain regions', fontdict=font) 
+    ax0.set_ylabel('Brain regions', fontdict=font)
+    ax0.set_xticks([])
+    ax0.set_yticks([])
+
+    left, bottom, width, height = 0.55, 0.2, 0.4, 0.4
+    ax1 = fig.add_axes([left, bottom, width, height])
+    c1 = ax1.pcolor(ICCs_recon[echo_index], norm=norm)
+    ax1.set_title('ICC - echo ' + str(echo_index+1) + ' test Recon', fontdict=font)
+    ax1.invert_yaxis()
+    ax1.set_aspect('equal', adjustable='box')
+    ax1.set_xlabel('Brain regions', fontdict=font) 
+    ax1.set_ylabel('Brain regions', fontdict=font)
+    ax1.set_xticks([])
+    ax1.set_yticks([])
+
+    cb = fig.colorbar(c0, ax=[ax0,ax1], orientation='vertical')
+    cb.ax.tick_params(labelsize=15)
+    if echo_index == echo_optcomb:
+        plt.savefig(os.path.join(ICC_path, "ICC_echo_optcomb.jpg"))
+    else:
+        plt.savefig(os.path.join(ICC_path, "ICC_echo_" + str(echo_index+1) + ".jpg"))
+    plt.close()

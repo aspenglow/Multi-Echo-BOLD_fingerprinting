@@ -3,7 +3,6 @@ from sklearn.decomposition import PCA
 from scipy.stats import pearsonr
 from tqdm import tqdm
 
-
 def pca_denoising(echo_test, echo_retest, orig_matrixs_test, orig_matrixs_retest):
     orig_matrixs_test_mean = np.mean(orig_matrixs_test, axis=1) # Calculate mean of each subject and echo
     orig_matrixs_retest_mean = np.mean(orig_matrixs_retest, axis=1)
@@ -76,6 +75,7 @@ def pca_denoising(echo_test, echo_retest, orig_matrixs_test, orig_matrixs_retest
     Iothers_opt = np.mean(Ident_mat_recon_opt[~mask_diag]) * 100
     # print("optimal number of PCs: " + str(m_star) + " optimal IDiff: " + str(Idiff_opt) + "%")
     
-    return Ident_mat_orig, Ident_mat_recon_opt, recon_matrix_opt_test, recon_matrix_opt_retest, PCA_comps_range, Idiff_orig, Idiff_recon, Idiff_opt, Iself_orig, Iself_opt, Iothers_orig, Iothers_opt
+    return Ident_mat_orig, Ident_mat_recon_opt, recon_matrix_opt_test, recon_matrix_opt_retest, PCA_comps_range, \
+        Idiff_orig, Idiff_recon, Idiff_opt, Iself_orig, Iself_opt, Iothers_orig, Iothers_opt
 
     
