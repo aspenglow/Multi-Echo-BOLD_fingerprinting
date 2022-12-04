@@ -4,7 +4,7 @@ from tqdm import tqdm
 import time
 import os
 
-from draw_results import draw_FC_reconstruction
+from fingerprinting.draw_results import draw_FC_reconstruction
 
 def FC_reconstruct(recon_FC_root_img_path, echo_test, echo_retest, echoes_total_num, recon_matrix_opt_test, recon_matrix_opt_retest, FCs_test, FCs_retest, if_save_FC):
     subjects_num = recon_matrix_opt_test.shape[1]
