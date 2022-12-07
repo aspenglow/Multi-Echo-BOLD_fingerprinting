@@ -57,8 +57,8 @@ def calculate_ICC(FCs_test, FCs_retest):
     ICCs_shape = (echoes_total_num, FC_side_length, FC_side_length)
     ICCs = np.zeros(ICCs_shape)
 
-    for echoes_index in tqdm(range(echoes_total_num+1), leave=False):
-        for brain_region_1 in range(FC_side_length):
+    for echoes_index in tqdm(range(echoes_total_num), desc='ICC echo', leave=False):
+        for brain_region_1 in tqdm(range(FC_side_length), desc='brain region 1', leave=False):
             for brain_region_2 in range(FC_side_length):                
                 edgewise_test = FCs_test[echoes_index, :, brain_region_1, brain_region_2]
                 edgewise_retest = FCs_retest[echoes_index, :, brain_region_1, brain_region_2]

@@ -9,7 +9,7 @@ from fingerprinting.draw_results import *
 
 def parse_args():
     parser = argparse.ArgumentParser(description='PCA denoising with spliting timeseries to test and retest.')
-    parser.add_argument('--data_path', default="./data0",
+    parser.add_argument('--data_path', default="./data",
                         help='path of the timeseries.')
     parser.add_argument('--result_path', default="./fingerprinting/results_nonsplit",
                         help='path to save results.')

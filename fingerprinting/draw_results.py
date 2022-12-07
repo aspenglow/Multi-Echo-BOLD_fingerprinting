@@ -88,7 +88,7 @@ def draw_echo_pair_results(echo_pair_result_path, Ident_mat_orig, Ident_mat_reco
         str_echo_index_test = "optcomb"
     if is_retest_optcomb:
         str_echo_index_retest = "optcomb"
-    plt.savefig(os.path.join(echo_pair_result_path, "Result_with_echo_" + str_echo_index_test + "&" + str_echo_index_retest + ".jpg"))
+    plt.savefig(os.path.join(echo_pair_result_path, "echo_" + str_echo_index_test + "&" + str_echo_index_retest + ".jpg"))
     plt.close()
 
 
@@ -273,7 +273,7 @@ def draw_Idiff_Iself_Iothers(image_path, Idiff_mat_orig, Idiff_mat_opt, Iself_ma
 def draw_echo_pairs_self_violin(image_path, self_elements_orig, self_elements_opt):
     fig = plt.figure(figsize=(18,10), dpi=100)
     font = {'size':20}
-    left, bottom, width, height = 0, 0.55, 0.9, 0.4
+    left, bottom, width, height = 0.05, 0.55, 0.9, 0.4
     ax0 = fig.add_axes([left, bottom, width, height])
     sns.violinplot([self_elements_orig[0], self_elements_orig[1], self_elements_orig[2], self_elements_orig[3], self_elements_orig[4], \
                     self_elements_orig[5], self_elements_orig[6], self_elements_orig[7], self_elements_orig[8], self_elements_orig[9]])
@@ -281,9 +281,9 @@ def draw_echo_pairs_self_violin(image_path, self_elements_orig, self_elements_op
     ax0.set_xticks([0,1,2,3,4,5,6,7,8,9])
     ax0.set_xticklabels(["2-1", "3-1", "4-1", "oc-1", "3-2", "4-2", "oc-2", "4-3", "oc-3", "oc-4"])
     ax0.tick_params(labelsize=15)
-    ax0.set_ylim(0, 1.3)
+    ax0.set_ylim(0.2, 1.2)
 
-    left, bottom, width, height = 0, 0.05, 1, 0.4
+    left, bottom, width, height = 0.05, 0.05, 0.9, 0.4
     ax1 = fig.add_axes([left, bottom, width, height])
     sns.violinplot([self_elements_opt[0], self_elements_opt[1], self_elements_opt[2], self_elements_opt[3], self_elements_opt[4], \
                     self_elements_opt[5], self_elements_opt[6], self_elements_opt[7], self_elements_opt[8], self_elements_opt[9]])
@@ -291,7 +291,7 @@ def draw_echo_pairs_self_violin(image_path, self_elements_orig, self_elements_op
     ax1.set_xticks([0,1,2,3,4,5,6,7,8,9])
     ax1.set_xticklabels(["2-1", "3-1", "4-1", "oc-1", "3-2", "4-2", "oc-2", "4-3", "oc-3", "oc-4"])
     ax1.tick_params(labelsize=15)
-    ax1.set_ylim(0, 1.3)
+    ax1.set_ylim(0.2, 1.2)
 
     plt.savefig(os.path.join(image_path, "Self_identifiability_echopairs.jpg"))
     plt.close()

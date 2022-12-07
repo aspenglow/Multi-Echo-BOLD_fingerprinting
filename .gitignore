@@ -1,7 +1,7 @@
 data/*
 fingerprinting/__*
 fingerprinting/*.ipynb
-fingerprinting/results*
+fingerprinting/*results*
 fingerprinting/fingerprinting_old.py
 *.zip
 data0/

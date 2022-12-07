@@ -10,7 +10,7 @@ from fingerprinting.ICC import calculate_ICC
 
 def parse_args():
     parser = argparse.ArgumentParser(description='PCA denoising with spliting timeseries to test and retest.')
-    parser.add_argument('--data_path', default="./data",
+    parser.add_argument('--data_path', default="./data0",
                         help='path of the timeseries.')
     parser.add_argument('--result_path', default="./fingerprinting/results_split",
                         help='path to save results.')
@@ -77,8 +77,9 @@ def fingerprinting_split(data_path='./data0', result_path='./fingerprinting/resu
             if if_icc or if_save_FC:
                 FC_test_recon, FC_retest_recon = FC_reconstruct(recon_FC_root_img_path, echo_test, echo_retest, echoes_total_num, \
                         recon_matrix_opt_test, recon_matrix_opt_retest, FCs_test, FCs_retest, if_save_FC)
-                FCs_test_recon[echo_test] = FC_test_recon
-                FCs_retest_recon[echo_retest] = FC_retest_recon
+                if echo_test == echo_retest:
+                    FCs_test_recon[echo_test] = FC_test_recon
+                    FCs_retest_recon[echo_retest] = FC_retest_recon
                 
         
     # Save Idiff Iself Iothers echo-pair matrix before denoising and after denoising. 

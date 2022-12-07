@@ -1,15 +1,15 @@
 import numpy as np
 import os
 import argparse
-from utils import *
+from fingerprinting.utils import *
 
-from draw_results import draw_Idiff_Iself_Iothers
+from fingerprinting.draw_results import draw_Idiff_Iself_Iothers
 
 def parse_args():
     parser = argparse.ArgumentParser(description='PCA denoising with spliting timeseries to test and retest.')
     parser.add_argument('--data_path', default="./fingerprinting/results/Idiff_root",
                         help='path to save results.')
-    parser.add_argument('--result_path', default="./fingerprinting/results",
+    parser.add_argument('--result_path', default="./fingerprinting/results_split",
                         help='path to save results.')
     args = parser.parse_args()
     return args
