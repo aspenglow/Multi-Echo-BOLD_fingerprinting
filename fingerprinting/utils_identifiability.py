@@ -714,7 +714,7 @@ def load_yeonets_matfile(filename='/home/andrea/Dropbox/Brain_data/Misc/yeoOrder
 
 
 def plot_ICC_mat(ICC_mat,yeo_net=True,yeoOrder=None,limit_yeo=None,
-                subcortical=None,percentile=95,ax=None):
+                subcortical=None,percentile=95,ax=None, title=None):
     if ax == None:
         fig=plt.figure(dpi=150)
         ax=plt.subplot(111)
@@ -758,6 +758,8 @@ def plot_ICC_mat(ICC_mat,yeo_net=True,yeoOrder=None,limit_yeo=None,
             plt.hlines(y1,y0,y1,colors='k',lw=1)
             plt.vlines(y0,y0,y1,colors='k',lw=1)
             plt.vlines(y1,y0,y1,colors='k',lw=1)
+    if title is not None:
+        plt.title(title)
 
 
 

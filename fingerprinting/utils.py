@@ -27,13 +27,13 @@ def FC_matrix_to_list(FC):
     return FC_list
 
 def FC_list_to_matrix(FC_list):
+    FC_side_length = int((1 + np.sqrt(1 + 8 * len(FC_list))) / 2)
     mask = np.tril(np.full((FC_side_length, FC_side_length), True, dtype=bool), -1) 
-    FC_side_length = len(FC_list)
-    ICCs_mat = np.identity(FC_side_length, dtype=float)
-    ICCs_mat[mask] = FC_list
-    ICCs_mat = ICCs_mat.transpose()
-    ICCs_mat[mask] = FC_list
-    return ICCs_mat 
+    FC_mat = np.identity(FC_side_length, dtype=float)
+    FC_mat[mask] = FC_list
+    FC_mat = FC_mat.transpose()
+    FC_mat[mask] = FC_list
+    return FC_mat 
 
 def FCs_normalize(FCs):
     t_FCs = (FCs - np.mean(FCs, axis=0)) / np.std(FCs, axis=0)
@@ -142,7 +142,7 @@ def save_Idiff_Iself_Iothers_txt(Idiff_root_path, Idiff_mat_orig, Idiff_mat_opt,
     np.savetxt(os.path.join(Iothers_orig_path, "Iothers_orig_" + current_time + ".txt"), Iothers_mat_orig)
     np.savetxt(os.path.join(Iothers_opt_path, "Iothers_opt_" + current_time + ".txt"), Iothers_mat_opt)
 
-def plot_FC_mat(ICCs_mat,yeo_net=True,yeoOrder=None,limit_yeo=None,
+def plot_FC_mat(FC_mat,yeo_net=True,yeoOrder=None,limit_yeo=None,
                 subcortical=None,percentile=95,ax=None, title=None):
     if ax == None:
         fig=plt.figure(dpi=150)
@@ -157,10 +157,10 @@ def plot_FC_mat(ICCs_mat,yeo_net=True,yeoOrder=None,limit_yeo=None,
     cmap = colors.ListedColormap(list_colors_yeo)
 
     if yeo_net==None:
-        ax.matshow(ICCs_mat,cmap=cmap)
+        ax.matshow(FC_mat,cmap=cmap)
     else:
-        FC_mat_reodered=ICCs_mat[yeoOrder,:][:,yeoOrder]
-        yeo_ICC_mat=np.where(FC_mat_reodered>np.percentile(ICCs_mat,q=percentile),0,np.nan)
+        FC_mat_reodered=FC_mat[yeoOrder,:][:,yeoOrder]
+        yeo_ICC_mat=np.where(FC_mat_reodered>np.percentile(FC_mat,q=percentile),0,np.nan)
         k=1
         for net,limits in limit_yeo.items():
             y0,y1=limits[0],limits[1]
@@ -169,17 +169,17 @@ def plot_FC_mat(ICCs_mat,yeo_net=True,yeoOrder=None,limit_yeo=None,
             k+=1
 
         ax.matshow(yeo_ICC_mat,cmap=cmap)
-        ax.set_xlim(-0,len(ICCs_mat));
-        ax.set_ylim(len(ICCs_mat),0);
+        ax.set_xlim(-0,len(FC_mat));
+        ax.set_ylim(len(FC_mat),0);
         s=0
         net_names=['VIS','SM','DA','VA','L','FP','DMN','SC']
         for net,limits in limit_yeo.items():
             y0,y1=limits[0],limits[1]
-#             if y0 <= len(ICCs_mat) and y1<= len(ICCs_mat):
+#             if y0 <= len(FC_mat) and y1<= len(FC_mat):
                 #print(y0,y1)
-            rect_upper = Rectangle((len(ICCs_mat)+2,y0),5, y1-y0, color =list_colors_yeo_center[s+1], clip_on=False,zorder=10)
-            rect_bottom = Rectangle((y0,len(ICCs_mat)+2),y1-y0,5,color =list_colors_yeo_center[s+1], clip_on=False,zorder=10)
-            ax.text(x=1.025*len(ICCs_mat),y=y0+(0.65*(y1-y0)),s=net_names[s],clip_on=False)
+            rect_upper = Rectangle((len(FC_mat)+2,y0),5, y1-y0, color =list_colors_yeo_center[s+1], clip_on=False,zorder=10)
+            rect_bottom = Rectangle((y0,len(FC_mat)+2),y1-y0,5,color =list_colors_yeo_center[s+1], clip_on=False,zorder=10)
+            ax.text(x=1.025*len(FC_mat),y=y0+(0.65*(y1-y0)),s=net_names[s],clip_on=False)
             s+=1
             ax.add_patch(rect_upper)
             ax.add_patch(rect_bottom)
@@ -190,15 +190,15 @@ def plot_FC_mat(ICCs_mat,yeo_net=True,yeoOrder=None,limit_yeo=None,
         if title is not None:
             plt.title(title)
 
-def compute_FC_yeo_net_dataframe(ICCs_mat,yeoOrder,limit_yeo):
-    FC_mat_reodered=ICCs_mat[yeoOrder,:][:,yeoOrder]
+def compute_FC_yeo_net_dataframe(FC_mat,yeoOrder,limit_yeo):
+    FC_mat_reodered=FC_mat[yeoOrder,:][:,yeoOrder]
     list_average_FC=[]
     list_yeo_repeated=[]
     s=1
     for net,limits in limit_yeo.items():
         y0,y1=limits[0],limits[1]
         gap=y1-y0
-#         if y0 <= len(ICCs_mat) and y1<= len(ICCs_mat):
+#         if y0 <= len(FC_mat) and y1<= len(FC_mat):
 #         print(y0,y1,len(FC_mat_reodered[y0:y1,y0:y1][~np.eye(gap,dtype=bool)].flatten()),(gap)*(gap-1))
         list_average_FC.extend(FC_mat_reodered[y0:y1,y0:y1][~np.eye(gap,dtype=bool)].flatten())
         list_yeo_repeated.extend(np.repeat(s,(gap)*(gap-1)))
@@ -207,15 +207,15 @@ def compute_FC_yeo_net_dataframe(ICCs_mat,yeoOrder,limit_yeo):
     current_df=current_df.rename(columns={0:'FC',1:'YeoNet'})
     return(current_df)
 
-def plot_FCs_violins(ICCs_mat,yeoOrder,limit_yeo,ax=None, title=None):
+def plot_FCs_violins(FC_mat,yeoOrder,limit_yeo,ax=None, title=None):
     if ax == None:
         fig=plt.figure(dpi=150)
         ax=plt.subplot(111)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
 
-    for echo in range(len(ICCs_mat)):
-        current_df = compute_FC_yeo_net_dataframe(ICCs_mat[echo],yeoOrder,limit_yeo)
+    for echo in range(len(FC_mat)):
+        current_df = compute_FC_yeo_net_dataframe(FC_mat[echo],yeoOrder,limit_yeo)
         if echo == 4:
             current_df["echo"] = "TE-oc"
         else:
@@ -238,15 +238,15 @@ def plot_FCs_violins(ICCs_mat,yeoOrder,limit_yeo,ax=None, title=None):
         ax.set_title(title)
 
 
-def plot_ICCs_violins(ICCs_mat,yeoOrder,limit_yeo,ax=None, title=None):
+def plot_ICCs_violins(FC_mat,yeoOrder,limit_yeo,ax=None, title=None):
     if ax == None:
         fig=plt.figure(dpi=150)
         ax=plt.subplot(111)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     
-    for echo in range(len(ICCs_mat)):
-        current_df = compute_ICC_yeo_net_dataframe(ICCs_mat[echo],yeoOrder,limit_yeo)
+    for echo in range(len(FC_mat)):
+        current_df = compute_ICC_yeo_net_dataframe(FC_mat[echo],yeoOrder,limit_yeo)
         if echo == 4:
             current_df["echo"] = "TE-oc"
         else:
@@ -268,13 +268,13 @@ def plot_ICCs_violins(ICCs_mat,yeoOrder,limit_yeo,ax=None, title=None):
     if title is not None:
         ax.set_title(title)
 
-# def plot_FC_mat_and_violins(ICCs_mat,yeoOrder,limit_yeo,percentile=95,subcortical=None):
+# def plot_FC_mat_and_violins(FC_mat,yeoOrder,limit_yeo,percentile=95,subcortical=None):
 #     fig=plt.figure(figsize=(10,6),dpi=150)
 #     gs = GridSpec(6, 2)
 #     ax=fig.add_subplot(gs[0:5, 0])
-#     plot_FC_mat(ICCs_mat,yeo_net=True,yeoOrder=yeoOrder,subcortical=subcortical,
+#     plot_FC_mat(FC_mat,yeo_net=True,yeoOrder=yeoOrder,subcortical=subcortical,
 #                 limit_yeo=limit_yeo,percentile=percentile,ax=ax)
 
 #     ax=fig.add_subplot(gs[1:4, 1])
-#     plot_FC_violins(ICCs_mat,yeoOrder=yeoOrder,limit_yeo=limit_yeo,ax=ax)
+#     plot_FC_violins(FC_mat,yeoOrder=yeoOrder,limit_yeo=limit_yeo,ax=ax)
 #     plt.subplots_adjust(wspace=0.32)
