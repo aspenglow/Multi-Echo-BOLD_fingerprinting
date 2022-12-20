@@ -62,7 +62,7 @@ def calculate_ICC(FCs_test, FCs_retest):
             for brain_region_2 in range(FC_side_length):                
                 edgewise_test = FCs_test[echoes_index, :, brain_region_1, brain_region_2]
                 edgewise_retest = FCs_retest[echoes_index, :, brain_region_1, brain_region_2]
-                edgewise = np.concatenate((edgewise_test[np.newaxis, :], edgewise_retest[np.newaxis, :]), axis=0)
+                edgewise = np.concatenate((edgewise_test[np.newaxis, :], edgewise_retest[np.newaxis, :]), axis=0).transpose()  
                 r, _, _, _, _, _, _ = ICC(edgewise)
                 ICCs[echoes_index, brain_region_1, brain_region_2] = r
     

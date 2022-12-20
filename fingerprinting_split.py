@@ -12,7 +12,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='PCA denoising with spliting timeseries to test and retest.')
     parser.add_argument('--data_path', default="./data0",
                         help='path of the timeseries.')
-    parser.add_argument('--result_path', default="./fingerprinting/results_split",
+    parser.add_argument('--result_path', default="./results/results_split",
                         help='path to save results.')
     parser.add_argument('--subjects_num', type=int, default=-1, 
                         help='number of subjects to calculate.')
@@ -37,7 +37,7 @@ def fingerprinting_split(data_path='./data0', result_path='./fingerprinting/resu
     print("There are " + str(subjects_total_num) + " subjects with " + str(echoes_total_num) + " echoes (include 1 optcomb).")
 
     # Load data
-    FCs_test, FCs_retest, orig_matrixs_test, orig_matrixs_retest = load_data_split(data_path, subjects_num, echoes_total_num)
+    TSs_test, TSs_retest, FCs_test, FCs_retest, orig_matrixs_test, orig_matrixs_retest = load_data_split(data_path, subjects_num, echoes_total_num)
     
     echo_pair_result_path = os.path.join(result_path, "echo_pair_results")
     if not os.path.exists(echo_pair_result_path):

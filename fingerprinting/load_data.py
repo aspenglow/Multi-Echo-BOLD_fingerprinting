@@ -2,8 +2,20 @@ import numpy as np
 import os
 from tqdm import tqdm
 import random
+from scipy import io
 
 def load_data_split(data_path, subjects_num, echoes_total_num):
+    loaded_data_path = "loaded_data"
+    if os.path.exists(os.path.join(loaded_data_path, "orig_matrixs_retest.npy")):
+        TCs_test = np.load(os.path.join(loaded_data_path, "TCs_test.npy"))
+        TCs_retest = np.load(os.path.join(loaded_data_path, "TCs_retest.npy"))
+        FCs_test = np.load(os.path.join(loaded_data_path, "FCs_test.npy"))
+        FCs_retest = np.load(os.path.join(loaded_data_path, "FCs_retest.npy"))
+        orig_matrixs_test = np.load(os.path.join(loaded_data_path, "orig_matrixs_test.npy"))
+        orig_matrixs_retest = np.load(os.path.join(loaded_data_path, "orig_matrixs_retest.npy"))
+
+        return TCs_test, TCs_retest, FCs_test, FCs_retest, orig_matrixs_test, orig_matrixs_retest 
+
     print("Loading time series from data path...")
     subjects_total_num = int(len(os.listdir(data_path)) / (echoes_total_num))
     data_lists = os.listdir(data_path)
@@ -14,6 +26,10 @@ def load_data_split(data_path, subjects_num, echoes_total_num):
 
     # Initialization
     count = np.zeros(echoes_total_num, dtype=int)
+    TC_length = test_data.shape[1]
+    TCs_shape = (echoes_total_num, subjects_total_num, test_data.shape[0], int(TC_length/2))
+    TCs_test = np.zeros(TCs_shape)
+    TCs_retest = np.zeros(TCs_shape)
     FCs_shape = (echoes_total_num, subjects_total_num, FC_side_length, FC_side_length)
     FCs_test = np.zeros(FCs_shape)
     FCs_retest = np.zeros(FCs_shape)
@@ -33,12 +49,12 @@ def load_data_split(data_path, subjects_num, echoes_total_num):
             echo_index = 4  # the last echo is for the optimal combination
         # Load time series data
         data = np.genfromtxt(fname=os.path.join(data_path, file), dtype='float32', delimiter=' ')
-        TS_length = data.shape[1]
-        TS_test = data[:, :int(TS_length/2)]
-        TS_retest = data[:, int(TS_length/2):]
+        TC_length = data.shape[1]
+        TC_test = data[:, :int(TC_length/2)]
+        TC_retest = data[:, int(TC_length/2):]
         # Calculate functional connectivity (FC) of a time series
-        FC_test = np.corrcoef(TS_test)
-        FC_retest = np.corrcoef(TS_retest)
+        FC_test = np.corrcoef(TC_test)
+        FC_retest = np.corrcoef(TC_retest)
         assert(np.sum(np.isnan(FC_test)) == 0) # make sure that all the FCs are valid.
         assert(np.sum(np.isnan(FC_retest)) == 0)
         assert(np.sum(np.isinf(FC_test)) == 0)
@@ -49,9 +65,11 @@ def load_data_split(data_path, subjects_num, echoes_total_num):
         orig_column_retest = FC_retest[mask]
 
         subject_index = count[echo_index]
+        TCs_test[echo_index, subject_index] = TC_test
+        TCs_retest[echo_index, subject_index] = TC_retest
         FCs_test[echo_index, subject_index] = FC_test
-        orig_matrixs_test[echo_index, :, subject_index] = orig_column_test 
         FCs_retest[echo_index, subject_index] = FC_retest
+        orig_matrixs_test[echo_index, :, subject_index] = orig_column_test 
         orig_matrixs_retest[echo_index, :, subject_index] = orig_column_retest
         count[echo_index] += 1
     
@@ -59,12 +77,26 @@ def load_data_split(data_path, subjects_num, echoes_total_num):
     if subjects_num < subjects_total_num:
         sample = random.sample(range(0, subjects_total_num), subjects_num)
         sample.sort()
+        TCs_test = TCs_test[:, sample]
+        TCs_retest = TCs_retest[:, sample]
         FCs_test = FCs_test[:, sample]
         FCs_retest = FCs_retest[:, sample]
         orig_matrixs_test = orig_matrixs_test[:, :, sample]
         orig_matrixs_retest = orig_matrixs_retest[:, :, sample]
 
-    return FCs_test, FCs_retest, orig_matrixs_test, orig_matrixs_retest 
+    
+    if not os.path.exists(loaded_data_path):
+        os.mkdir(loaded_data_path)
+
+    if not os.path.exists(os.path.join(loaded_data_path, "orig_matrixs_retest.npy")):
+        np.save(os.path.join(loaded_data_path, "TCs_test.npy"), TCs_test)
+        np.save(os.path.join(loaded_data_path, "TCs_retest.npy"), TCs_retest)
+        np.save(os.path.join(loaded_data_path, "FCs_test.npy"), FCs_test)
+        np.save(os.path.join(loaded_data_path, "FCs_retest.npy"), FCs_retest)
+        np.save(os.path.join(loaded_data_path, "orig_matrixs_test.npy"), orig_matrixs_test)
+        np.save(os.path.join(loaded_data_path, "orig_matrixs_retest.npy"), orig_matrixs_retest)
+
+    return TCs_test, TCs_retest, FCs_test, FCs_retest, orig_matrixs_test, orig_matrixs_retest 
 
 def load_data_nonsplit(data_path, subjects_num, echoes_total_num):
     print("Loading time series from data path...")

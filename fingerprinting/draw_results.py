@@ -1,10 +1,53 @@
 from matplotlib import pyplot as plt
 from matplotlib.ticker import MaxNLocator
 from matplotlib import colors
+import pandas as pd
 import seaborn as sns
 import os
 import numpy as np
 
+def draw_echoes_tSNRs(save_path, tSNRs):
+    echoes_list = []
+    tSNRs_list = []
+    for echo in range(tSNRs.shape[0]):
+        echoes_list.extend((np.repeat(echo+1,tSNRs.shape[1])))
+        tSNRs_list.extend(tSNRs[echo])
+    tSNRs_df=pd.DataFrame([echoes_list,tSNRs_list]).T
+    tSNRs_df=tSNRs_df.rename(columns={0:'echo',1:'tSNR'})
+    # g=sns.stripplot(x='echo', y='tSNR', data=tSNRs_df, jitter=0.3)
+    g=sns.violinplot(x='echo', y='tSNR', data=tSNRs_df)
+    
+    g.set_xticklabels(['TE-1', 'TE-2', 'TE-3', 'TE-4', 'oc'])
+    plt.savefig(os.path.join(save_path, "tSNRs.jpg"))
+    plt.close()
+
+def draw_compare_links_with_different_echoes(save_path, t_FCs):
+    '''
+    input: t_FCs -> 3D array of size (nechoes x nsubjects x nedges) with normalized flattened FCs 
+    '''
+    # t_FCs.reshape(t_FCs.shape[0], t_FCs.shape[1]*t_FCs.shape[2])
+    fig = plt.figure(dpi=150,figsize=(18,10))
+    ax= plt.subplot(121)
+    value_min = min(np.min(t_FCs[0]), np.min(t_FCs[1]))
+    value_max = max(np.max(t_FCs[0]), np.max(t_FCs[1]))
+    plt.plot([value_min, value_max],[value_min, value_max],'r-')
+    plt.scatter(t_FCs[0], t_FCs[1])
+    plt.xlabel('TE1')
+    plt.ylabel('TE4')
+    plt.title('links difference between TE1 and TE2')
+
+    ax= plt.subplot(122)
+    value_min = min(np.min(t_FCs[1]), np.min(t_FCs[3]))
+    value_max = max(np.max(t_FCs[1]), np.max(t_FCs[3]))
+    plt.plot([value_min, value_max],[value_min, value_max],'r-')
+    plt.scatter(t_FCs[1], t_FCs[3])
+    plt.xlabel('TE2')
+    plt.ylabel('oc')
+    plt.title('links difference between TE2 and TE4')
+    plt.savefig(os.path.join(save_path, "link_difference.jpg"))
+    plt.close()
+
+    
 
 def draw_echo_pair_results(echo_pair_result_path, Ident_mat_orig, Ident_mat_recon_opt, PCA_comps_range, Idiff_orig, Idiff_recon, Idiff_opt, echo_test, echo_retest, echo_optcomb):
     str_echo_index_test = str(echo_test + 1)
@@ -270,13 +313,13 @@ def draw_Idiff_Iself_Iothers(image_path, Idiff_mat_orig, Idiff_mat_opt, Iself_ma
     plt.savefig(os.path.join(image_path, "Idiff_Iself_Iothers.jpg"))
     plt.close()
 
-def draw_echo_pairs_self_violin(image_path, self_elements_orig, self_elements_opt):
+def draw_echo_pairs_self_violin(image_path, self_Ident_orig, self_Ident_opt):
     fig = plt.figure(figsize=(18,10), dpi=100)
     font = {'size':20}
     left, bottom, width, height = 0.05, 0.55, 0.9, 0.4
     ax0 = fig.add_axes([left, bottom, width, height])
-    sns.violinplot([self_elements_orig[0], self_elements_orig[1], self_elements_orig[2], self_elements_orig[3], self_elements_orig[4], \
-                    self_elements_orig[5], self_elements_orig[6], self_elements_orig[7], self_elements_orig[8], self_elements_orig[9]])
+    sns.violinplot([self_Ident_orig[0], self_Ident_orig[1], self_Ident_orig[2], self_Ident_orig[3], self_Ident_orig[4], \
+                    self_Ident_orig[5], self_Ident_orig[6], self_Ident_orig[7], self_Ident_orig[8], self_Ident_orig[9]])
     ax0.set_title('Self Identifiabilities before PCA denoising', fontdict=font)
     ax0.set_xticks([0,1,2,3,4,5,6,7,8,9])
     ax0.set_xticklabels(["2-1", "3-1", "4-1", "oc-1", "3-2", "4-2", "oc-2", "4-3", "oc-3", "oc-4"])
@@ -285,8 +328,8 @@ def draw_echo_pairs_self_violin(image_path, self_elements_orig, self_elements_op
 
     left, bottom, width, height = 0.05, 0.05, 0.9, 0.4
     ax1 = fig.add_axes([left, bottom, width, height])
-    sns.violinplot([self_elements_opt[0], self_elements_opt[1], self_elements_opt[2], self_elements_opt[3], self_elements_opt[4], \
-                    self_elements_opt[5], self_elements_opt[6], self_elements_opt[7], self_elements_opt[8], self_elements_opt[9]])
+    sns.violinplot([self_Ident_opt[0], self_Ident_opt[1], self_Ident_opt[2], self_Ident_opt[3], self_Ident_opt[4], \
+                    self_Ident_opt[5], self_Ident_opt[6], self_Ident_opt[7], self_Ident_opt[8], self_Ident_opt[9]])
     ax1.set_title('Self Identifiabilities after PCA denoising', fontdict=font)
     ax1.set_xticks([0,1,2,3,4,5,6,7,8,9])
     ax1.set_xticklabels(["2-1", "3-1", "4-1", "oc-1", "3-2", "4-2", "oc-2", "4-3", "oc-3", "oc-4"])
@@ -295,6 +338,32 @@ def draw_echo_pairs_self_violin(image_path, self_elements_orig, self_elements_op
 
     plt.savefig(os.path.join(image_path, "Self_identifiability_echopairs.jpg"))
     plt.close()
+
+def draw_self_Ident_violin(image_path, self_Ident_orig, self_Ident_opt):
+    fig = plt.figure(figsize=(18,10), dpi=100)
+    font = {'size':20}
+    left, bottom, width, height = 0.05, 0.55, 0.9, 0.4
+    ax0 = fig.add_axes([left, bottom, width, height])
+    sns.violinplot([self_Ident_orig[0], self_Ident_orig[1], self_Ident_orig[2], self_Ident_orig[3], self_Ident_orig[4]])
+    ax0.set_title('Self Identifiabilities before PCA denoising', fontdict=font)
+    ax0.set_xticks([0,1,2,3,4])
+    ax0.set_xticklabels(["1-1", "2-2", "3-3", "4-4", "oc-oc"])
+    ax0.tick_params(labelsize=15)
+    ax0.set_ylim(0.2, 1.2)
+
+    left, bottom, width, height = 0.05, 0.05, 0.9, 0.4
+    ax1 = fig.add_axes([left, bottom, width, height])
+    sns.violinplot([self_Ident_opt[0], self_Ident_opt[1], self_Ident_opt[2], self_Ident_opt[3], self_Ident_opt[4], \
+                    ])
+    ax1.set_title('Self Identifiabilities after PCA denoising', fontdict=font)
+    ax1.set_xticks([0,1,2,3,4])
+    ax1.set_xticklabels(["1-1", "2-2", "3-3", "4-4", "oc-oc"])
+    ax1.tick_params(labelsize=15)
+    ax1.set_ylim(0.2, 1.2)
+
+    plt.savefig(os.path.join(image_path, "Self_identifiability_echopairs.jpg"))
+    plt.close()
+
 
 def draw_ICC(ICC_path, ICCs, ICCs_recon, echo_index, echo_optcomb):
     ICCs_min = min(np.min(ICCs[echo_index]), np.min(ICCs_recon[echo_index]))
