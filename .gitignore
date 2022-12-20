@@ -1,6 +1,5 @@
 data/*
 fingerprinting/__*
-*.ipynb
 fingerprinting/*results*
 results/*
 fingerprinting/fingerprinting_old.py
