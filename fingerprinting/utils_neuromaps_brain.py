@@ -54,7 +54,7 @@ def truncate_colormap(cmap, minval=0.0, maxval=1.0, n=100):
 def normal_view(current_nodestrength, edges=False, surftype='inflated',
                 xlabel=r'$<s_i> $', q_thresh=0.0, cmap='RdBu_r',
                 brightness=0.7, exp_form=True, parcellation=100,
-                vmin=None, vmax=None,graymap_rev=False,alpha_graymap=1.):
+                vmin=None, vmax=None,graymap_rev=False,alpha_graymap=1., title=None):
     '''
     Compute 2 different brain views to obtain a simple representation of the brain map
     by considering 'lateral' and 'medial'views
@@ -188,6 +188,9 @@ def normal_view(current_nodestrength, edges=False, surftype='inflated',
         fig.axes[1].set_xlabel(label, fontsize=20)
         plt.annotate('x $10^{{{0:d}}}$'.format(scale_pow), xy=(0.6, -0.075),
                      fontsize=14, xycoords='axes fraction', color='k', alpha=0.6)
+
+    if title is not None:
+        plt.title(title)
     plt.close()
     return(fig)
 

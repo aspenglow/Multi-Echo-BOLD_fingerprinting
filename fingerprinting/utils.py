@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.stats as stats
+from scipy.fftpack import fft
 from tqdm import tqdm
 import time
 import os
@@ -34,6 +35,85 @@ def FC_list_to_matrix(FC_list):
     FC_mat = FC_mat.transpose()
     FC_mat[mask] = FC_list
     return FC_mat 
+
+def compute_falff_from_single_TC(TC, TR, min_freq, max_freq):
+    '''
+    Compute the fALFF of TC
+
+    input: TC -> numpy 1D array
+           TR -> repetition time of time series
+           min_freq, max_freq -> range of frequency of fALFF
+
+    output: fALFF of TC
+    '''
+
+    n = len(TC)
+    freq_scale = np.fft.fftfreq(n, TR)
+    freq_index = np.where((min_freq <= freq_scale) & (freq_scale <= max_freq))
+
+    fft_parcel = fft(TC)    
+    power_parcel = (abs(fft_parcel))**0.5
+    freq_pow_sum = np.sum(power_parcel[freq_index])
+    total_pow_sum = np.sum(power_parcel)
+
+    falff = np.divide(freq_pow_sum, total_pow_sum)
+    return falff
+
+def compute_falff_from_TCs(TCs, TR, min_freq, max_freq):
+    '''
+    Compute the falff of TCs
+
+    input: TCs -> numpy 2D array, TC of each parcellation
+           TR -> repetition time of time series
+           min_freq, max_freq -> range of frequency of "danyang"
+
+    output: numpy 1D array, falff of each parcallation TC
+    '''
+    falffs = []
+    for i in range(len(TCs)): 
+        falff_parcel = compute_falff_from_single_TC(TCs[i], TR=TR, min_freq=min_freq, max_freq=max_freq)
+        falffs.append(falff_parcel)  
+    return np.array(falffs)
+    
+def compute_danyang_from_single_TC(TC, TR, min_freq, max_freq):
+    '''
+    Compute the "danyang" of TC
+
+    input: TC -> numpy 1D array
+           TR -> repetition time of time series
+           min_freq, max_freq -> range of frequency of "danyang"
+
+    output: "danyang" of TC
+    '''
+
+    n = len(TC)
+    freq_scale = np.fft.fftfreq(n, TR)
+    freq_index = np.where((min_freq <= freq_scale) & (freq_scale <= max_freq))
+
+    fft_parcel = fft(TC)    
+    power_parcel = (abs(fft_parcel))**0.5
+    freq_pow_sum = np.sum(power_parcel[freq_index])
+    total_pow_sum = np.sum(power_parcel)
+    others_pow_sum = total_pow_sum - freq_pow_sum
+
+    danyang = np.divide((freq_pow_sum - others_pow_sum), others_pow_sum)
+    return danyang
+
+def compute_danyang_from_TCs(TCs, TR, min_freq, max_freq):
+    '''
+    Compute the "danyang" of TCs
+
+    input: TCs -> numpy 2D array, TC of each parcellation
+           TR -> repetition time of time series
+           min_freq, max_freq -> range of frequency of "danyang"
+
+    output: numpy 1D array, "danyang" of each parcallation TC
+    '''
+    danyangs = []
+    for i in range(len(TCs)): 
+        danyang_parcel = compute_danyang_from_single_TC(TCs[i], TR=TR, min_freq=min_freq, max_freq=max_freq)
+        danyangs.append(danyang_parcel)
+    return np.array(danyangs)
 
 def FCs_normalize(FCs):
     t_FCs = (FCs - np.mean(FCs, axis=0)) / np.std(FCs, axis=0)
